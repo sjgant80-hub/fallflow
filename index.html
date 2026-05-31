@@ -1,0 +1,1120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>fallflow · 14-day cash runway · Friday-by-Friday wall</title>
+<meta name="description" content="Paste a bank CSV. See the Friday you go red. 14-day forward cash-runway early-warning for SMBs · sovereign single-file · prime 353.">
+<meta name="theme-color" content="#0b0a0f">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;700;800&family=DM+Mono:wght@400;500&family=Libre+Baskerville:ital@0;1&display=swap" rel="stylesheet">
+<link rel="manifest" href='data:application/manifest+json;charset=utf-8,{"name":"fallflow","short_name":"fallflow","start_url":"./","display":"standalone","background_color":"%230b0a0f","theme_color":"%230b0a0f","icons":[{"src":"data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 192 192%22><rect width=%22192%22 height=%22192%22 fill=%22%230b0a0f%22/><text x=%2296%22 y=%22118%22 font-size=%22118%22 text-anchor=%22middle%22 fill=%22%23d4a853%22 font-family=%22serif%22>%E2%97%8A</text></svg>","sizes":"192x192","type":"image/svg+xml"}]}'>
+<link rel="icon" href='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="%230b0a0f"/><text x="32" y="44" font-size="44" text-anchor="middle" fill="%23d4a853" font-family="serif">%E2%97%8A</text></svg>'>
+<style>
+:root {
+  --ox: #8b1a1a;
+  --brass: #b8974a;
+  --gold: #d4a853;
+  --cream: #c4bfb2;
+  --void: #0b0a0f;
+  --surface: #14131a;
+  --surface-2: #1a1822;
+  --border: #2a2730;
+  --muted: #6f6b78;
+  --green: #4a8a4a;
+  --amber: #c87e3a;
+  --red: #c8371a;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--void); color: var(--cream); font-family: 'Syne', system-ui, sans-serif; min-height: 100vh; -webkit-text-size-adjust: 100%; }
+body { background-image: radial-gradient(at 12% 0%, rgba(139,26,26,0.08) 0%, transparent 42%), radial-gradient(at 88% 100%, rgba(184,151,74,0.05) 0%, transparent 38%); }
+header { padding: 22px 28px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+header h1 { font-family: 'Libre Baskerville', serif; font-size: 22px; margin: 0; letter-spacing: 0.02em; }
+header h1 em { color: var(--gold); font-style: normal; }
+header .meta { font-family: 'DM Mono'; font-size: 10.5px; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; }
+main { max-width: 1280px; margin: 0 auto; padding: 24px 28px 80px; }
+@media (max-width: 720px) { main { padding: 18px 14px 80px; } header { padding: 18px 14px; } header h1 { font-size: 18px; } }
+.layout { display: grid; grid-template-columns: 1fr; gap: 22px; }
+@media (min-width: 980px) { .layout { grid-template-columns: 420px 1fr; align-items: start; } }
+
+.card { background: var(--surface); border: 1px solid var(--border); padding: 20px; }
+.card h2 { font-family: 'Libre Baskerville', serif; font-size: 17px; margin: 0 0 12px; color: var(--cream); border-bottom: 1px solid var(--border); padding-bottom: 10px; letter-spacing: 0.01em; }
+.card h2 .sub { color: var(--muted); font-size: 11px; font-family: 'DM Mono'; letter-spacing: 0.1em; text-transform: uppercase; float: right; padding-top: 4px; }
+.field { margin-bottom: 12px; }
+.field label { font-family: 'DM Mono'; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 5px; }
+.field input, .field textarea, .field select {
+  width: 100%; background: var(--void); border: 1px solid var(--border); color: var(--cream);
+  padding: 9px 11px; font-family: 'DM Mono'; font-size: 13px; border-radius: 0;
+}
+.field input:focus, .field textarea:focus, .field select:focus { outline: 1px solid var(--gold); outline-offset: -1px; }
+.field textarea { resize: vertical; min-height: 100px; line-height: 1.4; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.btn {
+  background: var(--ox); color: var(--cream); border: none; padding: 11px 20px;
+  font-family: 'Syne'; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  font-size: 12px; cursor: pointer; transition: background 0.15s, color 0.15s; border-radius: 0;
+}
+.btn:hover { background: var(--gold); color: var(--void); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--cream); }
+.btn.ghost:hover { border-color: var(--gold); color: var(--gold); background: transparent; }
+.btn.sm { padding: 7px 12px; font-size: 10.5px; }
+.btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+
+.cliff {
+  margin: 0 0 18px; padding: 16px 18px; border: 1px solid var(--border); background: var(--surface);
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+}
+.cliff .lbl { font-family: 'DM Mono'; font-size: 10.5px; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; }
+.cliff .val { font-family: 'Libre Baskerville', serif; font-size: 26px; color: var(--gold); }
+.cliff .val.bad { color: var(--red); }
+.cliff .val.ok { color: var(--green); }
+.cliff .countdown { font-family: 'DM Mono'; font-size: 13px; color: var(--cream); }
+
+.wall { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.fri {
+  background: var(--surface); border: 1px solid var(--border); padding: 14px;
+  position: relative; min-height: 110px; display: flex; flex-direction: column; justify-content: space-between;
+}
+.fri .date { font-family: 'DM Mono'; font-size: 10.5px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+.fri .bal { font-family: 'Libre Baskerville', serif; font-size: 22px; line-height: 1.1; margin-top: 6px; }
+.fri .delta { font-family: 'DM Mono'; font-size: 11px; color: var(--muted); margin-top: 4px; }
+.fri .status { font-family: 'Syne'; font-weight: 800; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; padding: 3px 7px; align-self: flex-start; margin-top: 8px; color: white; }
+.fri.red { border-color: var(--red); background: linear-gradient(180deg, rgba(200,55,26,0.18), var(--surface)); }
+.fri.red .bal { color: #ff8a7a; }
+.fri.red .status { background: var(--red); }
+.fri.amber { border-color: var(--amber); background: linear-gradient(180deg, rgba(200,126,58,0.16), var(--surface)); }
+.fri.amber .bal { color: #f5c97a; }
+.fri.amber .status { background: var(--amber); }
+.fri.green { border-color: rgba(74,138,74,0.45); }
+.fri.green .bal { color: #8ac88a; }
+.fri.green .status { background: var(--green); }
+.fri.locked { opacity: 0.5; }
+.fri.locked::after { content: 'PAID ◊'; position: absolute; top: 8px; right: 10px; font-family: 'DM Mono'; font-size: 9px; color: var(--gold); letter-spacing: 0.14em; }
+
+.tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 14px; gap: 0; flex-wrap: wrap; }
+.tabs button {
+  background: transparent; border: none; color: var(--muted); padding: 10px 16px;
+  font-family: 'Syne'; font-weight: 700; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+  cursor: pointer; border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s;
+}
+.tabs button:hover { color: var(--cream); }
+.tabs button.active { color: var(--gold); border-bottom-color: var(--gold); }
+
+.tx-list, .inv-list, .rep-list { max-height: 360px; overflow-y: auto; border: 1px solid var(--border); }
+.tx-row, .inv-row, .rep-row { display: grid; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--border); align-items: center; font-family: 'DM Mono'; font-size: 11.5px; }
+.tx-row { grid-template-columns: 78px 1fr 80px 60px; }
+.inv-row { grid-template-columns: 92px 1fr 80px 60px 28px; }
+.rep-row { grid-template-columns: 1fr 80px 70px 28px; }
+.tx-row:last-child, .inv-row:last-child, .rep-row:last-child { border-bottom: none; }
+.tx-row .desc, .inv-row .desc, .rep-row .desc { color: var(--cream); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tx-row .amt, .inv-row .amt, .rep-row .amt { text-align: right; }
+.tx-row .amt.pos { color: var(--green); }
+.tx-row .amt.neg { color: #ff8a7a; }
+.tx-row .cat select, .inv-row .late select { background: var(--void); border: 1px solid var(--border); color: var(--cream); font-family: 'DM Mono'; font-size: 10.5px; padding: 3px 4px; width: 100%; }
+.tx-row .date, .inv-row .date, .rep-row .desc { color: var(--muted); }
+.icon-btn { background: transparent; border: 1px solid var(--border); color: var(--muted); cursor: pointer; padding: 3px 6px; font-family: 'DM Mono'; font-size: 11px; }
+.icon-btn:hover { color: var(--red); border-color: var(--red); }
+
+.summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.metric { background: var(--surface-2); border: 1px solid var(--border); padding: 10px 12px; }
+.metric .lbl { font-family: 'DM Mono'; font-size: 9.5px; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; }
+.metric .val { font-family: 'Libre Baskerville', serif; font-size: 18px; color: var(--cream); margin-top: 3px; }
+.metric .val.pos { color: var(--green); }
+.metric .val.neg { color: #ff8a7a; }
+
+.tag { display: inline-block; padding: 2px 7px; font-family: 'DM Mono'; font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; border: 1px solid var(--border); color: var(--muted); }
+.tag.gold { color: var(--gold); border-color: var(--gold); }
+.tag.brass { color: var(--brass); border-color: var(--brass); }
+
+.watermark { position: fixed; bottom: 8px; right: 12px; font-family: 'DM Mono'; font-size: 9.5px; color: var(--muted); letter-spacing: 0.15em; pointer-events: none; opacity: 0.55; z-index: 5; }
+.watermark.show { opacity: 0.55; }
+.watermark.hidden { display: none; }
+
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--surface); border: 1px solid var(--gold); color: var(--cream); padding: 12px 20px; font-family: 'DM Mono'; font-size: 12px; z-index: 1000; max-width: 90vw; }
+.modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.78); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.modal { background: var(--surface); border: 1px solid var(--gold); padding: 24px; max-width: 480px; width: 100%; }
+.modal h3 { font-family: 'Libre Baskerville', serif; margin: 0 0 12px; color: var(--gold); font-size: 18px; }
+.modal p { font-family: 'DM Mono'; font-size: 12.5px; line-height: 1.65; color: var(--cream); }
+.modal .btn-row { margin-top: 16px; justify-content: flex-end; display: flex; gap: 8px; }
+.empty-hint { padding: 24px 18px; font-family: 'DM Mono'; font-size: 12px; line-height: 1.65; color: var(--muted); text-align: center; border: 1px dashed var(--border); }
+.empty-hint strong { color: var(--gold); }
+
+footer { padding: 22px 28px; border-top: 1px solid var(--border); font-family: 'DM Mono'; font-size: 10.5px; color: var(--muted); text-align: center; letter-spacing: 0.08em; }
+footer a { color: var(--brass); text-decoration: none; }
+footer a:hover { color: var(--gold); }
+
+@media print {
+  body { background: white; color: black; }
+  header, footer, .pane-left, .tabs, .btn-row, .cliff { display: none !important; }
+  .layout { display: block; }
+  .fri { border: 1px solid #333 !important; background: white !important; color: black !important; page-break-inside: avoid; }
+  .fri .bal { color: black !important; }
+  .fri.red { background: #ffe0d8 !important; }
+  .fri.amber { background: #ffefcc !important; }
+  .fri.green { background: #e0f0e0 !important; }
+  .watermark { display: none; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>◊ <em>fallflow</em> · cash runway · 14-day forward</h1>
+  <div class="meta">prime 353 · v1.0 · sovereign · <span id="tierBadge">trial</span></div>
+</header>
+
+<main>
+
+<div class="cliff" id="cliffBar">
+  <div>
+    <div class="lbl">Cliff date</div>
+    <div class="val" id="cliffDate">—</div>
+  </div>
+  <div>
+    <div class="lbl">Days until red</div>
+    <div class="countdown" id="cliffDays">—</div>
+  </div>
+  <div>
+    <div class="lbl">Today's balance</div>
+    <div class="val" id="todayBal">£—</div>
+  </div>
+  <div>
+    <div class="lbl">14-day projected</div>
+    <div class="val" id="endBal">£—</div>
+  </div>
+</div>
+
+<div class="layout">
+
+  <section class="pane-left">
+
+    <div class="card">
+      <h2>1 · Paste bank CSV <span class="sub">Monzo · Starling · HSBC · Barclays</span></h2>
+      <div class="field">
+        <label>CSV (Date, Description, Amount — header optional)</label>
+        <textarea id="csvInput" placeholder="2026-05-20,Tesco Stores,-43.21&#10;2026-05-21,Client Acme Ltd,2400.00&#10;2026-05-22,Standing Order Rent,-1200.00"></textarea>
+      </div>
+      <div class="btn-row">
+        <button class="btn" id="parseBtn">Parse ▸</button>
+        <button class="btn ghost sm" id="exampleBtn">Load example</button>
+        <button class="btn ghost sm" id="clearBtn">Clear all</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 18px;">
+      <h2>2 · Settings</h2>
+      <div class="row2">
+        <div class="field">
+          <label>Current balance £</label>
+          <input id="curBal" type="number" step="0.01" placeholder="auto-detect">
+        </div>
+        <div class="field">
+          <label>Safety floor £</label>
+          <input id="floor" type="number" step="100" value="2000">
+        </div>
+      </div>
+      <div class="field">
+        <label>Account name</label>
+        <input id="acctName" type="text" value="Main account" maxlength="40">
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 18px;">
+      <h2>3 · Upcoming invoices</h2>
+      <div class="row2">
+        <div class="field">
+          <label>Due date</label>
+          <input id="invDate" type="date">
+        </div>
+        <div class="field">
+          <label>Amount £</label>
+          <input id="invAmt" type="number" step="0.01" placeholder="2400.00">
+        </div>
+      </div>
+      <div class="field">
+        <label>Description / client</label>
+        <input id="invDesc" type="text" placeholder="Acme Ltd · invoice 0042">
+      </div>
+      <div class="field">
+        <label>Likely paid late?</label>
+        <select id="invLate">
+          <option value="0">On time (0% late)</option>
+          <option value="50" selected>Half chance late (50%)</option>
+          <option value="100">Always late (+14 days)</option>
+        </select>
+      </div>
+      <button class="btn sm" id="addInvBtn">Add invoice +</button>
+    </div>
+
+  </section>
+
+  <section class="pane-right">
+
+    <div class="tabs">
+      <button data-tab="wall" class="active">Friday wall</button>
+      <button data-tab="tx">Transactions</button>
+      <button data-tab="rep">Repeating</button>
+      <button data-tab="inv">Invoices</button>
+      <button data-tab="export">Export</button>
+    </div>
+
+    <div id="tab-wall" class="tab-pane">
+      <div class="summary" id="summary"></div>
+      <div id="wallContainer">
+        <div class="empty-hint">
+          Paste a bank CSV on the left to see your Friday-by-Friday wall — <strong>red</strong> below £0, <strong>amber</strong> below your safety floor, <strong>green</strong> above. Or tap <strong>Load example</strong> to see it working.
+        </div>
+      </div>
+    </div>
+
+    <div id="tab-tx" class="tab-pane" style="display:none">
+      <div id="txContainer"><div class="empty-hint">No transactions yet — paste a CSV.</div></div>
+    </div>
+
+    <div id="tab-rep" class="tab-pane" style="display:none">
+      <p style="font-family:'DM Mono';font-size:12px;color:var(--muted);line-height:1.6">Detected repeating expenses from your history. These get projected forward automatically.</p>
+      <div id="repContainer"><div class="empty-hint">Parse a CSV with ≥30 days of history to detect repeating expenses.</div></div>
+    </div>
+
+    <div id="tab-inv" class="tab-pane" style="display:none">
+      <div id="invContainer"><div class="empty-hint">No invoices added — use the form on the left.</div></div>
+    </div>
+
+    <div id="tab-export" class="tab-pane" style="display:none">
+      <p style="font-family:'DM Mono';font-size:12px;color:var(--muted);line-height:1.6">Snapshot your projection — keep it, print it, share it.</p>
+      <div class="btn-row">
+        <button class="btn sm" id="exportJsonBtn">Snapshot JSON</button>
+        <button class="btn sm" id="importJsonBtn">Import JSON</button>
+        <input type="file" id="importFile" accept="application/json,.json" style="display:none">
+        <button class="btn ghost sm" id="printBtn">Print wall (PDF)</button>
+        <button class="btn ghost sm" id="shareBtn">Share link</button>
+      </div>
+      <div style="margin-top:16px;font-family:'DM Mono';font-size:11px;color:var(--muted);line-height:1.7">
+        <strong style="color:var(--brass)">Share link</strong> · encodes your projection in a URL. One-tap send by WhatsApp or email. Recipient sees the same wall — no account needed.<br>
+        <strong style="color:var(--brass)">Print</strong> · clean wall-only PDF · A4-friendly · keep one in your books.<br>
+        <strong style="color:var(--brass)">Snapshot</strong> · saves all data as JSON · for your records or to switch device.
+      </div>
+    </div>
+
+  </section>
+</div>
+
+<div style="margin-top: 24px; padding: 16px; border: 1px solid var(--border); background: var(--surface); font-family: 'DM Mono'; font-size: 11px; color: var(--muted); line-height: 1.65;">
+  <strong style="color: var(--brass)">How the projection works</strong> · 14-day forward (60-day on paid tier) using three signals: (1) <strong style="color:var(--cream)">repeating expenses</strong> auto-detected from history (rent, payroll, standing orders) · (2) <strong style="color:var(--cream)">upcoming invoices</strong> you add manually — with late-payment uncertainty · (3) <strong style="color:var(--cream)">variable expense average</strong> from the trailing 30 days. The Friday wall is the early-warning surface — current apps tell you you're overdrawn after it happens. fallflow shows the Friday you go red <em>two weeks before it happens</em>.
+</div>
+
+</main>
+
+<footer>
+  ◊ fallflow · prime 353 · MIT · single-file sovereign · runs from file:// · <a href="https://github.com/sjgant80-hub/fallflow">source</a>
+</footer>
+
+<div class="watermark hidden" id="watermark">◊ fallflow · trial</div>
+
+<script>
+'use strict';
+
+const VERSION = '1.0.0';
+const PRIME = 353;
+const ONE_DAY = 86400000;
+const FRIDAY = 5; // JS getDay(): Sun=0..Sat=6
+
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+const state = {
+  transactions: [],   // {date:Date, desc, amount, category}
+  invoices: [],       // {id, due:Date, amount, desc, latePct}
+  repeating: [],      // {desc, amount, dayOfMonth, signature, locked?}
+  settings: {
+    currentBalance: null,
+    floor: 2000,
+    accountName: 'Main account',
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════
+// KONOMI LICENCE SHIM
+// Ed25519 dead-mode envelope · 30-day trial · device-bound
+// Free: 1 account · 14-day forward · watermark
+// Paid: multi-account · 60-day forward · scenario simulator
+// ═══════════════════════════════════════════════════════════════
+const KONOMI = (() => {
+  const DEVICE_KEY = 'fallflow_device_id';
+  const TRIAL_KEY = 'fallflow_trial_start';
+  const LICENCE_KEY = 'fallflow_licence';
+  const USAGE_KEY = 'fallflow_usage';
+  const TRIAL_DAYS = 30;
+  let deviceId = localStorage.getItem(DEVICE_KEY);
+  if (!deviceId) {
+    deviceId = 'dev_' + (crypto.randomUUID ? crypto.randomUUID().slice(0,8) : Math.random().toString(36).slice(2,10));
+    localStorage.setItem(DEVICE_KEY, deviceId);
+  }
+  let trialStart = +localStorage.getItem(TRIAL_KEY);
+  if (!trialStart) { trialStart = Date.now(); localStorage.setItem(TRIAL_KEY, String(trialStart)); }
+  const licence = localStorage.getItem(LICENCE_KEY); // ed25519 sig placeholder
+  const trialDaysLeft = Math.max(0, TRIAL_DAYS - Math.floor((Date.now() - trialStart) / ONE_DAY));
+  const usage = +(localStorage.getItem(USAGE_KEY) || 0);
+  localStorage.setItem(USAGE_KEY, String(usage + 1));
+  const active = !!licence; // would be: Ed25519 verify(licence, deviceId)
+  const tier = active ? 'paid' : (trialDaysLeft > 0 ? 'trial' : 'free');
+  return {
+    deviceId, tier, active, trialDaysLeft, usage: usage + 1,
+    horizonDays: (tier === 'paid') ? 60 : 14,
+    maxAccounts: (tier === 'paid') ? 99 : 1,
+    showWatermark: !active,
+    redeem: (key) => { localStorage.setItem(LICENCE_KEY, key); location.reload(); },
+    capDialog: (feature) => showModal(
+      'Paid feature · ' + feature,
+      'This is in the paid tier — multi-account, 60-day forward, scenario simulator (what if Client X pays late?). The free tool stays free for one account, 14-day forward, forever. Watermark removed on paid.\n\nDeviceID: ' + deviceId.slice(0,12) + '\nTrial days left: ' + trialDaysLeft
+    ),
+  };
+})();
+
+// ═══════════════════════════════════════════════════════════════
+// FALLMESH HOOK · prime 353
+// ═══════════════════════════════════════════════════════════════
+const mesh = (() => {
+  try {
+    const ch = new BroadcastChannel('fall-signal');
+    ch.postMessage({ source: 'fallflow', type: 'hello', prime: PRIME, version: VERSION, ts: Date.now() });
+    return {
+      emit: (kind, payload) => {
+        try { ch.postMessage({ source: 'fallflow', type: kind, prime: PRIME, payload, ts: Date.now() }); } catch (e) {}
+      },
+    };
+  } catch (e) { return { emit: () => {} }; }
+})();
+
+// ═══════════════════════════════════════════════════════════════
+// PERSISTENCE · IndexedDB primary · localStorage fallback
+// ═══════════════════════════════════════════════════════════════
+const DB_NAME = 'fallflow';
+const DB_STORE = 'data';
+let _db = null;
+function openDB() {
+  return new Promise((resolve, reject) => {
+    if (_db) return resolve(_db);
+    if (!window.indexedDB) return reject('no idb');
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(DB_STORE);
+    req.onsuccess = () => { _db = req.result; resolve(_db); };
+    req.onerror = () => reject(req.error);
+  });
+}
+async function saveState() {
+  const snapshot = {
+    transactions: state.transactions.map(t => ({ ...t, date: t.date.toISOString() })),
+    invoices: state.invoices.map(i => ({ ...i, due: i.due.toISOString() })),
+    repeating: state.repeating,
+    settings: state.settings,
+  };
+  try {
+    const db = await openDB();
+    const tx = db.transaction(DB_STORE, 'readwrite');
+    tx.objectStore(DB_STORE).put(snapshot, 'main');
+  } catch (e) {
+    try { localStorage.setItem('fallflow_state', JSON.stringify(snapshot)); } catch (e2) {}
+  }
+}
+async function loadState() {
+  let snap = null;
+  try {
+    const db = await openDB();
+    const tx = db.transaction(DB_STORE, 'readonly');
+    snap = await new Promise((res) => { const r = tx.objectStore(DB_STORE).get('main'); r.onsuccess = () => res(r.result); r.onerror = () => res(null); });
+  } catch (e) {
+    try { snap = JSON.parse(localStorage.getItem('fallflow_state') || 'null'); } catch (e2) { snap = null; }
+  }
+  if (!snap) return false;
+  state.transactions = (snap.transactions || []).map(t => ({ ...t, date: new Date(t.date) }));
+  state.invoices = (snap.invoices || []).map(i => ({ ...i, due: new Date(i.due) }));
+  state.repeating = snap.repeating || [];
+  state.settings = { ...state.settings, ...(snap.settings || {}) };
+  return true;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CSV PARSER · vanilla · auto-detect separator + columns + dates
+// ═══════════════════════════════════════════════════════════════
+function parseCSV(text) {
+  text = text.replace(/^﻿/, '').trim();
+  if (!text) return [];
+  // Detect separator from first line
+  const firstLine = text.split(/\r?\n/)[0];
+  const counts = { ',': 0, '\t': 0, ';': 0 };
+  let inQ = false;
+  for (const ch of firstLine) {
+    if (ch === '"') inQ = !inQ;
+    else if (!inQ && counts[ch] !== undefined) counts[ch]++;
+  }
+  const sep = Object.entries(counts).sort((a,b) => b[1]-a[1])[0][0];
+  // Parse rows
+  const rows = [];
+  let cur = [''], qq = false, i = 0;
+  while (i < text.length) {
+    const ch = text[i];
+    if (qq) {
+      if (ch === '"' && text[i+1] === '"') { cur[cur.length-1] += '"'; i += 2; continue; }
+      if (ch === '"') { qq = false; i++; continue; }
+      cur[cur.length-1] += ch; i++;
+    } else {
+      if (ch === '"') { qq = true; i++; continue; }
+      if (ch === sep) { cur.push(''); i++; continue; }
+      if (ch === '\r') { i++; continue; }
+      if (ch === '\n') { rows.push(cur); cur = ['']; i++; continue; }
+      cur[cur.length-1] += ch; i++;
+    }
+  }
+  if (cur.length > 1 || cur[0] !== '') rows.push(cur);
+  return rows.filter(r => r.some(c => c.trim() !== ''));
+}
+
+function parseDate(s) {
+  if (!s) return null;
+  s = s.trim().replace(/['"]/g, '');
+  // ISO YYYY-MM-DD or YYYY/MM/DD
+  let m = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+  if (m) return new Date(+m[1], +m[2]-1, +m[3]);
+  // DD/MM/YYYY or DD-MM-YYYY
+  m = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})/);
+  if (m) {
+    let y = +m[3]; if (y < 100) y += 2000;
+    return new Date(y, +m[2]-1, +m[1]);
+  }
+  // Try native
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+
+function parseMoney(s) {
+  if (!s) return null;
+  s = String(s).trim();
+  if (s === '') return null;
+  // strip £, $, €, commas, spaces, handle parens for negative
+  let neg = false;
+  if (/^\(.*\)$/.test(s)) { neg = true; s = s.slice(1,-1); }
+  s = s.replace(/[£$€,\s]/g, '');
+  if (s.startsWith('-')) { neg = true; s = s.slice(1); }
+  const n = parseFloat(s);
+  if (isNaN(n)) return null;
+  return neg ? -n : n;
+}
+
+function detectColumns(rows) {
+  if (!rows.length) return null;
+  // Look at first row — is it a header?
+  const first = rows[0].map(c => c.trim().toLowerCase());
+  const hasHeader = first.some(c => /date|description|amount|debit|credit|memo|reference|narrative|details/.test(c));
+  let dateIdx = -1, descIdx = -1, amtIdx = -1, debitIdx = -1, creditIdx = -1;
+  if (hasHeader) {
+    first.forEach((h, idx) => {
+      if (dateIdx < 0 && /date|posted/.test(h)) dateIdx = idx;
+      if (descIdx < 0 && /description|narrative|details|memo|reference|payee|merchant/.test(h)) descIdx = idx;
+      if (amtIdx < 0 && /^amount|total|value/.test(h)) amtIdx = idx;
+      if (debitIdx < 0 && /debit|out|paid out|money out/.test(h)) debitIdx = idx;
+      if (creditIdx < 0 && /credit|in|paid in|money in/.test(h)) creditIdx = idx;
+    });
+  }
+  if (dateIdx < 0 || (amtIdx < 0 && (debitIdx < 0 && creditIdx < 0))) {
+    // No reliable header — infer by content from sample rows
+    const sample = (hasHeader ? rows.slice(1, 6) : rows.slice(0, 6));
+    const colCount = Math.max(...sample.map(r => r.length));
+    for (let c = 0; c < colCount; c++) {
+      const vals = sample.map(r => r[c] || '');
+      const dateHits = vals.filter(v => parseDate(v)).length;
+      const moneyHits = vals.filter(v => parseMoney(v) !== null && /[\d.,()-]/.test(v)).length;
+      if (dateIdx < 0 && dateHits >= Math.max(2, vals.length - 1)) dateIdx = c;
+      else if (amtIdx < 0 && moneyHits >= Math.max(2, vals.length - 1)) amtIdx = c;
+    }
+    if (descIdx < 0) {
+      // pick the longest text-y column that isn't date/amt
+      let best = -1, bestLen = 0;
+      for (let c = 0; c < colCount; c++) {
+        if (c === dateIdx || c === amtIdx) continue;
+        const avg = sample.reduce((s,r) => s + (r[c] || '').length, 0) / sample.length;
+        if (avg > bestLen) { bestLen = avg; best = c; }
+      }
+      descIdx = best;
+    }
+  }
+  return { hasHeader, dateIdx, descIdx, amtIdx, debitIdx, creditIdx };
+}
+
+function parseBankCSV(text) {
+  const rows = parseCSV(text);
+  if (!rows.length) return { ok: false, error: 'No data found' };
+  const cols = detectColumns(rows);
+  if (!cols || cols.dateIdx < 0) return { ok: false, error: 'Could not detect Date column' };
+  const dataRows = cols.hasHeader ? rows.slice(1) : rows;
+  const txs = [];
+  for (const r of dataRows) {
+    const date = parseDate(r[cols.dateIdx]);
+    if (!date) continue;
+    let amount = null;
+    if (cols.amtIdx >= 0) amount = parseMoney(r[cols.amtIdx]);
+    if (amount === null && cols.debitIdx >= 0) {
+      const d = parseMoney(r[cols.debitIdx]);
+      if (d !== null && d !== 0) amount = -Math.abs(d);
+    }
+    if (amount === null && cols.creditIdx >= 0) {
+      const c = parseMoney(r[cols.creditIdx]);
+      if (c !== null && c !== 0) amount = Math.abs(c);
+    }
+    if (amount === null) continue;
+    const desc = (cols.descIdx >= 0 ? (r[cols.descIdx] || '') : '').trim() || '(no description)';
+    txs.push({ date, desc, amount, category: autoCategorise(desc, amount) });
+  }
+  txs.sort((a, b) => a.date - b.date);
+  return { ok: true, transactions: txs };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AUTO-CATEGORISE · smart heuristics from description
+// ═══════════════════════════════════════════════════════════════
+const CAT_RULES = [
+  { cat: 'rent', re: /\brent\b|landlord|letting/i },
+  { cat: 'payroll', re: /payroll|salary|wages|paye|hmrc paye/i },
+  { cat: 'tax', re: /\bhmrc\b|tax|vat|corp tax/i },
+  { cat: 'utilities', re: /electric|gas|water|edf|british gas|octopus|thames water|bt |sky |virgin media|three uk|vodafone|o2/i },
+  { cat: 'software', re: /aws|google|microsoft|adobe|github|stripe fee|figma|notion|slack|zoom|atlassian/i },
+  { cat: 'food', re: /tesco|sainsbury|asda|aldi|lidl|morrison|m&s food|waitrose|coop|spar|just eat|deliveroo|uber eats/i },
+  { cat: 'transport', re: /tfl|trainline|uber|bolt|esso|shell|bp |petrol|fuel/i },
+  { cat: 'standing-order', re: /standing order|s\/o\b|direct debit|d\/d\b/i },
+  { cat: 'fees', re: /fee|charge|interest/i },
+  { cat: 'transfer', re: /transfer|xfer|sent to|received from/i },
+];
+function autoCategorise(desc, amount) {
+  if (amount > 0) return 'income';
+  for (const r of CAT_RULES) if (r.re.test(desc)) return r.cat;
+  return 'other';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REPEATING EXPENSE DETECTOR
+// ═══════════════════════════════════════════════════════════════
+function normalisedDesc(s) {
+  return s.toLowerCase().replace(/\d+/g, '').replace(/\s+/g, ' ').replace(/[^a-z ]/g, '').trim().slice(0, 30);
+}
+function detectRepeating(txs) {
+  // Group by normalised desc, look for monthly cadence
+  const groups = {};
+  for (const t of txs) {
+    if (t.amount >= 0) continue; // expenses only
+    const key = normalisedDesc(t.desc);
+    if (!key) continue;
+    (groups[key] = groups[key] || []).push(t);
+  }
+  const reps = [];
+  for (const key in groups) {
+    const g = groups[key].sort((a,b) => a.date - b.date);
+    if (g.length < 2) continue;
+    // Check gaps look monthly (25-35 days)
+    const gaps = [];
+    for (let i = 1; i < g.length; i++) gaps.push((g[i].date - g[i-1].date) / ONE_DAY);
+    const monthly = gaps.filter(d => d >= 25 && d <= 35).length;
+    if (monthly < gaps.length * 0.6) continue;
+    const avgAmt = g.reduce((s, t) => s + t.amount, 0) / g.length;
+    const lastDate = g[g.length-1].date;
+    reps.push({
+      desc: g[g.length-1].desc.slice(0, 40),
+      amount: Math.round(avgAmt * 100) / 100,
+      dayOfMonth: lastDate.getDate(),
+      lastSeen: lastDate.toISOString(),
+      signature: key,
+    });
+  }
+  return reps.sort((a,b) => a.amount - b.amount);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// VARIABLE EXPENSE AVERAGE (trailing 30d, excluding repeating)
+// ═══════════════════════════════════════════════════════════════
+function variableDailyAvg(txs, repeating) {
+  const now = Date.now();
+  const cutoff = now - 30 * ONE_DAY;
+  const repSigs = new Set(repeating.map(r => r.signature));
+  let total = 0, n = 0;
+  for (const t of txs) {
+    if (t.amount >= 0) continue;
+    if (t.date.getTime() < cutoff) continue;
+    if (repSigs.has(normalisedDesc(t.desc))) continue;
+    total += t.amount;
+    n++;
+  }
+  // distribute over 30 days
+  return total / 30;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PROJECTION · day-by-day, balance walked forward
+// ═══════════════════════════════════════════════════════════════
+function todayMidnight() { const d = new Date(); d.setHours(0,0,0,0); return d; }
+function fmtGBP(n) { const v = Math.round(n); return (v < 0 ? '-£' : '£') + Math.abs(v).toLocaleString('en-GB'); }
+function fmtGBP2(n) { return (n < 0 ? '-£' : '£') + Math.abs(n).toFixed(2); }
+function isoDate(d) { return d.toISOString().slice(0, 10); }
+function fridayName(d) {
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return months[d.getMonth()] + ' ' + d.getDate();
+}
+
+function project(horizonDays) {
+  const days = [];
+  const today = todayMidnight();
+  // Starting balance: user override OR sum of all transactions (assumes CSV is full history)
+  let bal = state.settings.currentBalance;
+  if (bal === null || bal === undefined || isNaN(bal)) {
+    bal = state.transactions.reduce((s, t) => s + t.amount, 0);
+  }
+  const dailyVar = variableDailyAvg(state.transactions, state.repeating);
+  for (let i = 0; i <= horizonDays; i++) {
+    const d = new Date(today.getTime() + i * ONE_DAY);
+    const events = [];
+    // Daily variable burn (skip day 0 to anchor today's bal)
+    if (i > 0 && dailyVar !== 0) {
+      bal += dailyVar;
+      events.push({ desc: 'Variable expenses (avg)', amount: dailyVar });
+    }
+    // Repeating expenses on their day-of-month
+    for (const r of state.repeating) {
+      if (r.locked) continue;
+      if (d.getDate() === r.dayOfMonth && i > 0) {
+        bal += r.amount;
+        events.push({ desc: r.desc, amount: r.amount });
+      }
+    }
+    // Invoices: expected payment day = due + (latePct/100)*14 days
+    for (const inv of state.invoices) {
+      const slip = Math.round((inv.latePct / 100) * 14);
+      const expected = new Date(inv.due.getTime() + slip * ONE_DAY);
+      expected.setHours(0,0,0,0);
+      if (i > 0 && expected.getTime() === d.getTime()) {
+        bal += inv.amount;
+        events.push({ desc: inv.desc + ' (invoice)', amount: inv.amount });
+      }
+    }
+    days.push({ date: d, balance: bal, events });
+  }
+  return days;
+}
+
+function projectFridays(days) {
+  const fris = [];
+  for (const d of days) {
+    if (d.date.getDay() === FRIDAY) fris.push(d);
+  }
+  return fris;
+}
+
+function classify(balance, floor) {
+  if (balance < 0) return 'red';
+  if (balance < floor) return 'amber';
+  return 'green';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════
+function renderAll() {
+  const horizon = KONOMI.horizonDays;
+  const days = project(horizon);
+  const fris = projectFridays(days);
+  const floor = state.settings.floor || 0;
+  // Cliff bar
+  const todayBal = days[0]?.balance ?? 0;
+  const endBal = days[days.length-1]?.balance ?? 0;
+  const firstRed = fris.find(f => f.balance < 0);
+  document.getElementById('todayBal').textContent = fmtGBP(todayBal);
+  document.getElementById('todayBal').className = 'val ' + (todayBal < 0 ? 'bad' : 'ok');
+  document.getElementById('endBal').textContent = fmtGBP(endBal);
+  document.getElementById('endBal').className = 'val ' + (endBal < 0 ? 'bad' : (endBal < floor ? '' : 'ok'));
+  if (firstRed) {
+    document.getElementById('cliffDate').textContent = fridayName(firstRed.date);
+    document.getElementById('cliffDate').className = 'val bad';
+    const daysOut = Math.round((firstRed.date - todayMidnight()) / ONE_DAY);
+    document.getElementById('cliffDays').textContent = daysOut + ' days · ' + fmtGBP(firstRed.balance) + ' projected';
+    mesh.emit('cashflow_red_friday', { date: firstRed.date.toISOString(), balance: firstRed.balance, days: daysOut });
+  } else {
+    document.getElementById('cliffDate').textContent = 'No cliff';
+    document.getElementById('cliffDate').className = 'val ok';
+    document.getElementById('cliffDays').textContent = 'Above £0 across ' + horizon + ' days';
+  }
+  // Wall
+  const wall = document.getElementById('wallContainer');
+  if (!state.transactions.length && !state.invoices.length) {
+    wall.innerHTML = '<div class="empty-hint">Paste a bank CSV on the left to see your Friday-by-Friday wall — <strong>red</strong> below £0, <strong>amber</strong> below your safety floor, <strong>green</strong> above. Or tap <strong>Load example</strong> to see it working.</div>';
+  } else {
+    let html = '<div class="wall">';
+    let prev = todayBal;
+    for (const f of fris) {
+      const cls = classify(f.balance, floor);
+      const delta = f.balance - prev;
+      const deltaStr = (delta >= 0 ? '+' : '') + fmtGBP(delta);
+      html += `<div class="fri ${cls}">
+        <div>
+          <div class="date">Fri · ${fridayName(f.date)}</div>
+          <div class="bal">${fmtGBP(f.balance)}</div>
+          <div class="delta">Δ ${deltaStr} since last Fri</div>
+        </div>
+        <div class="status">${cls === 'red' ? 'below zero' : cls === 'amber' ? 'below floor' : 'safe'}</div>
+      </div>`;
+      prev = f.balance;
+    }
+    html += '</div>';
+    wall.innerHTML = html;
+  }
+  // Summary metrics
+  const totalIncome = state.transactions.filter(t => t.amount > 0).reduce((s,t) => s + t.amount, 0);
+  const totalExp = state.transactions.filter(t => t.amount < 0).reduce((s,t) => s + t.amount, 0);
+  const burnRate = variableDailyAvg(state.transactions, state.repeating);
+  const fixedMonthly = state.repeating.reduce((s, r) => s + r.amount, 0);
+  document.getElementById('summary').innerHTML = `
+    <div class="metric"><div class="lbl">Transactions</div><div class="val">${state.transactions.length}</div></div>
+    <div class="metric"><div class="lbl">Income (history)</div><div class="val pos">${fmtGBP(totalIncome)}</div></div>
+    <div class="metric"><div class="lbl">Expenses (history)</div><div class="val neg">${fmtGBP(totalExp)}</div></div>
+    <div class="metric"><div class="lbl">Daily burn (variable)</div><div class="val neg">${fmtGBP(burnRate)}</div></div>
+    <div class="metric"><div class="lbl">Fixed monthly</div><div class="val neg">${fmtGBP(fixedMonthly)}</div></div>
+    <div class="metric"><div class="lbl">Open invoices</div><div class="val">${state.invoices.length}</div></div>
+  `;
+  renderTx();
+  renderRep();
+  renderInv();
+}
+
+function renderTx() {
+  const c = document.getElementById('txContainer');
+  if (!state.transactions.length) { c.innerHTML = '<div class="empty-hint">No transactions yet — paste a CSV.</div>'; return; }
+  const show = state.transactions.slice().reverse().slice(0, 200);
+  let html = '<div class="tx-list">';
+  const cats = ['income','rent','payroll','tax','utilities','software','food','transport','standing-order','fees','transfer','other'];
+  for (let i = 0; i < show.length; i++) {
+    const t = show[i];
+    const idx = state.transactions.indexOf(t);
+    html += `<div class="tx-row">
+      <div class="date">${isoDate(t.date)}</div>
+      <div class="desc" title="${escapeHTML(t.desc)}">${escapeHTML(t.desc)}</div>
+      <div class="amt ${t.amount >= 0 ? 'pos' : 'neg'}">${fmtGBP2(t.amount)}</div>
+      <div class="cat"><select data-tx-cat="${idx}">${cats.map(c => `<option value="${c}"${c===t.category?' selected':''}>${c}</option>`).join('')}</select></div>
+    </div>`;
+  }
+  html += '</div>';
+  if (state.transactions.length > 200) html += `<div style="font-family:'DM Mono';font-size:11px;color:var(--muted);padding:8px 4px">showing latest 200 of ${state.transactions.length}</div>`;
+  c.innerHTML = html;
+  c.querySelectorAll('select[data-tx-cat]').forEach(sel => {
+    sel.addEventListener('change', () => {
+      const i = +sel.getAttribute('data-tx-cat');
+      state.transactions[i].category = sel.value;
+      saveState();
+    });
+  });
+}
+
+function renderRep() {
+  const c = document.getElementById('repContainer');
+  if (!state.repeating.length) { c.innerHTML = '<div class="empty-hint">No repeating expenses detected. Need ≥2 monthly occurrences in history.</div>'; return; }
+  let html = '<div class="rep-list">';
+  for (let i = 0; i < state.repeating.length; i++) {
+    const r = state.repeating[i];
+    html += `<div class="rep-row">
+      <div class="desc" title="${escapeHTML(r.desc)}">${escapeHTML(r.desc)} · day ${r.dayOfMonth}</div>
+      <div class="amt neg">${fmtGBP2(r.amount)}</div>
+      <div class="date">${r.locked ? 'paid' : 'monthly'}</div>
+      <button class="icon-btn" data-rep-del="${i}" title="remove">×</button>
+    </div>`;
+  }
+  html += '</div>';
+  c.innerHTML = html;
+  c.querySelectorAll('[data-rep-del]').forEach(b => {
+    b.addEventListener('click', () => {
+      state.repeating.splice(+b.getAttribute('data-rep-del'), 1);
+      saveState(); renderAll();
+    });
+  });
+}
+
+function renderInv() {
+  const c = document.getElementById('invContainer');
+  if (!state.invoices.length) { c.innerHTML = '<div class="empty-hint">No invoices added — use the form on the left.</div>'; return; }
+  let html = '<div class="inv-list">';
+  for (let i = 0; i < state.invoices.length; i++) {
+    const inv = state.invoices[i];
+    html += `<div class="inv-row">
+      <div class="date">${isoDate(inv.due)}</div>
+      <div class="desc" title="${escapeHTML(inv.desc)}">${escapeHTML(inv.desc)}</div>
+      <div class="amt pos">${fmtGBP2(inv.amount)}</div>
+      <div class="late"><select data-inv-late="${i}">
+        <option value="0"${inv.latePct===0?' selected':''}>0%</option>
+        <option value="50"${inv.latePct===50?' selected':''}>50%</option>
+        <option value="100"${inv.latePct===100?' selected':''}>100%</option>
+      </select></div>
+      <button class="icon-btn" data-inv-del="${i}" title="remove">×</button>
+    </div>`;
+  }
+  html += '</div>';
+  c.innerHTML = html;
+  c.querySelectorAll('[data-inv-del]').forEach(b => {
+    b.addEventListener('click', () => {
+      state.invoices.splice(+b.getAttribute('data-inv-del'), 1);
+      saveState(); renderAll();
+    });
+  });
+  c.querySelectorAll('[data-inv-late]').forEach(s => {
+    s.addEventListener('change', () => {
+      const i = +s.getAttribute('data-inv-late');
+      state.invoices[i].latePct = +s.value;
+      saveState(); renderAll();
+    });
+  });
+}
+
+function escapeHTML(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EVENT HANDLERS
+// ═══════════════════════════════════════════════════════════════
+function parseAndApply() {
+  const txt = document.getElementById('csvInput').value;
+  if (!txt.trim()) { toast('Paste a bank CSV first'); return; }
+  const r = parseBankCSV(txt);
+  if (!r.ok) { toast('CSV parse failed: ' + r.error); return; }
+  if (!r.transactions.length) { toast('No valid rows found — check column format'); return; }
+  state.transactions = r.transactions;
+  state.repeating = detectRepeating(r.transactions);
+  saveState();
+  renderAll();
+  toast(r.transactions.length + ' transactions parsed · ' + state.repeating.length + ' repeating detected');
+}
+
+function loadExample() {
+  const today = todayMidnight();
+  const lines = ['Date,Description,Amount'];
+  // Build 45-day history with realistic patterns
+  for (let i = 45; i >= 1; i--) {
+    const d = new Date(today.getTime() - i * ONE_DAY);
+    const iso = isoDate(d);
+    // Monthly rent on the 1st
+    if (d.getDate() === 1) lines.push(`${iso},Standing Order Rent,-1850.00`);
+    // Monthly payroll on the 28th
+    if (d.getDate() === 28) lines.push(`${iso},Payroll Sarah Wages,-2100.00`);
+    // Weekly Tesco shops
+    if (d.getDay() === 6) lines.push(`${iso},Tesco Stores Croydon,${-(35 + Math.random()*45).toFixed(2)}`);
+    // Software DD on the 15th
+    if (d.getDate() === 15) lines.push(`${iso},AWS Web Services,-247.30`);
+    if (d.getDate() === 15) lines.push(`${iso},Adobe Creative Cloud,-52.99`);
+    // Random fuel
+    if (i % 7 === 3) lines.push(`${iso},Shell Petrol Station,${-(45 + Math.random()*20).toFixed(2)}`);
+    // Random food delivery
+    if (i % 11 === 2) lines.push(`${iso},Deliveroo,${-(22 + Math.random()*18).toFixed(2)}`);
+    // Income — Acme Ltd pays 25th
+    if (d.getDate() === 25) lines.push(`${iso},Acme Ltd invoice 001,4500.00`);
+    // Smaller client every fortnight
+    if (i === 10 || i === 24 || i === 38) lines.push(`${iso},Bright Studio Ltd,1200.00`);
+  }
+  document.getElementById('csvInput').value = lines.join('\n');
+  document.getElementById('curBal').value = '3400';
+  state.settings.currentBalance = 3400;
+  // Add an example invoice 9 days out
+  const exampleInv = {
+    id: 'ex_' + Date.now(),
+    due: new Date(today.getTime() + 9 * ONE_DAY),
+    amount: 2400,
+    desc: 'Acme Ltd · invoice 042',
+    latePct: 50,
+  };
+  state.invoices = [exampleInv];
+  parseAndApply();
+  toast('Example loaded · 45 days history · 1 upcoming invoice');
+}
+
+function addInvoice() {
+  const due = parseDate(document.getElementById('invDate').value);
+  const amt = parseFloat(document.getElementById('invAmt').value);
+  const desc = document.getElementById('invDesc').value.trim() || 'invoice';
+  const late = +document.getElementById('invLate').value;
+  if (!due) { toast('Enter a due date'); return; }
+  if (!amt || isNaN(amt)) { toast('Enter an amount'); return; }
+  state.invoices.push({ id: 'i_' + Date.now(), due, amount: Math.abs(amt), desc, latePct: late });
+  document.getElementById('invDate').value = '';
+  document.getElementById('invAmt').value = '';
+  document.getElementById('invDesc').value = '';
+  saveState();
+  renderAll();
+  toast('Invoice added · ' + fmtGBP(Math.abs(amt)) + ' due ' + isoDate(due));
+}
+
+function exportJSON() {
+  const snap = {
+    version: VERSION,
+    exported: new Date().toISOString(),
+    transactions: state.transactions.map(t => ({ ...t, date: t.date.toISOString() })),
+    invoices: state.invoices.map(i => ({ ...i, due: i.due.toISOString() })),
+    repeating: state.repeating,
+    settings: state.settings,
+  };
+  const blob = new Blob([JSON.stringify(snap, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'fallflow-' + isoDate(new Date()) + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function importJSON(file) {
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const snap = JSON.parse(r.result);
+      state.transactions = (snap.transactions || []).map(t => ({ ...t, date: new Date(t.date) }));
+      state.invoices = (snap.invoices || []).map(i => ({ ...i, due: new Date(i.due) }));
+      state.repeating = snap.repeating || [];
+      state.settings = { ...state.settings, ...(snap.settings || {}) };
+      document.getElementById('curBal').value = state.settings.currentBalance ?? '';
+      document.getElementById('floor').value = state.settings.floor;
+      document.getElementById('acctName').value = state.settings.accountName;
+      saveState(); renderAll();
+      toast('Imported ' + state.transactions.length + ' transactions');
+    } catch (e) { toast('Import failed: ' + e.message); }
+  };
+  r.readAsText(file);
+}
+
+function shareLink() {
+  const snap = {
+    v: VERSION,
+    s: state.settings,
+    i: state.invoices.map(i => ({ ...i, due: i.due.toISOString() })),
+    r: state.repeating,
+    // Only share derived metrics, not raw tx (privacy)
+    summary: {
+      todayBal: project(KONOMI.horizonDays)[0]?.balance ?? 0,
+      txCount: state.transactions.length,
+    },
+  };
+  try {
+    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(snap))));
+    const url = location.origin + location.pathname + '#s=' + encoded;
+    navigator.clipboard.writeText(url).then(() => toast('Share link copied — paste anywhere'), () => prompt('Copy this link:', url));
+  } catch (e) { toast('Share encoding failed'); }
+}
+
+function loadFromHash() {
+  if (!location.hash.startsWith('#s=')) return;
+  try {
+    const encoded = location.hash.slice(3);
+    const snap = JSON.parse(decodeURIComponent(escape(atob(encoded))));
+    state.settings = { ...state.settings, ...(snap.s || {}) };
+    state.invoices = (snap.i || []).map(i => ({ ...i, due: new Date(i.due) }));
+    state.repeating = snap.r || [];
+    toast('Shared projection loaded · read-only · paste your own CSV to extend');
+  } catch (e) {}
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UI WIRING
+// ═══════════════════════════════════════════════════════════════
+let _toastTimer = null;
+function toast(msg) {
+  let t = document.querySelector('.toast');
+  if (t) t.remove();
+  t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.remove(), 3200);
+}
+
+function showModal(title, body) {
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg';
+  bg.innerHTML = `<div class="modal"><h3>${escapeHTML(title)}</h3><p>${escapeHTML(body).replace(/\n/g, '<br>')}</p><div class="btn-row"><button class="btn sm" id="modalClose">OK</button></div></div>`;
+  document.body.appendChild(bg);
+  bg.querySelector('#modalClose').addEventListener('click', () => bg.remove());
+  bg.addEventListener('click', e => { if (e.target === bg) bg.remove(); });
+}
+
+function wire() {
+  // Tabs
+  document.querySelectorAll('.tabs button').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.tabs button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      const t = b.getAttribute('data-tab');
+      document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
+      document.getElementById('tab-' + t).style.display = 'block';
+    });
+  });
+  // Buttons
+  document.getElementById('parseBtn').addEventListener('click', parseAndApply);
+  document.getElementById('exampleBtn').addEventListener('click', loadExample);
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    if (!confirm('Clear all data — transactions, invoices, settings?')) return;
+    state.transactions = []; state.invoices = []; state.repeating = [];
+    state.settings = { currentBalance: null, floor: 2000, accountName: 'Main account' };
+    document.getElementById('csvInput').value = '';
+    document.getElementById('curBal').value = '';
+    document.getElementById('floor').value = 2000;
+    document.getElementById('acctName').value = 'Main account';
+    saveState(); renderAll();
+    toast('All cleared');
+  });
+  document.getElementById('addInvBtn').addEventListener('click', addInvoice);
+  document.getElementById('exportJsonBtn').addEventListener('click', exportJSON);
+  document.getElementById('importJsonBtn').addEventListener('click', () => document.getElementById('importFile').click());
+  document.getElementById('importFile').addEventListener('change', (e) => {
+    if (e.target.files[0]) importJSON(e.target.files[0]);
+    e.target.value = '';
+  });
+  document.getElementById('printBtn').addEventListener('click', () => window.print());
+  document.getElementById('shareBtn').addEventListener('click', shareLink);
+  // Settings live update
+  document.getElementById('curBal').addEventListener('input', () => {
+    const v = parseFloat(document.getElementById('curBal').value);
+    state.settings.currentBalance = isNaN(v) ? null : v;
+    saveState(); renderAll();
+  });
+  document.getElementById('floor').addEventListener('input', () => {
+    state.settings.floor = parseFloat(document.getElementById('floor').value) || 0;
+    saveState(); renderAll();
+  });
+  document.getElementById('acctName').addEventListener('input', () => {
+    state.settings.accountName = document.getElementById('acctName').value;
+    saveState();
+  });
+  // Tier badge
+  const tierEl = document.getElementById('tierBadge');
+  tierEl.textContent = KONOMI.tier + (KONOMI.tier === 'trial' ? ' · ' + KONOMI.trialDaysLeft + 'd left' : '');
+  tierEl.style.color = KONOMI.tier === 'paid' ? 'var(--gold)' : (KONOMI.tier === 'trial' ? 'var(--brass)' : 'var(--muted)');
+  tierEl.style.cursor = 'pointer';
+  tierEl.addEventListener('click', () => KONOMI.capDialog('upgrade'));
+  // Watermark
+  if (KONOMI.showWatermark) {
+    const w = document.getElementById('watermark');
+    w.classList.remove('hidden'); w.classList.add('show');
+    w.textContent = '◊ fallflow · ' + KONOMI.tier;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════════════════════
+(async function init() {
+  wire();
+  await loadState();
+  loadFromHash();
+  document.getElementById('curBal').value = state.settings.currentBalance ?? '';
+  document.getElementById('floor').value = state.settings.floor;
+  document.getElementById('acctName').value = state.settings.accountName;
+  renderAll();
+  if (!state.transactions.length && !state.invoices.length) {
+    setTimeout(() => toast('Welcome · paste a CSV or tap Load example'), 600);
+  }
+})();
+</script>
+</body>
+</html>
