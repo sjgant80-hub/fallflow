@@ -1,0 +1,37 @@
+[
+  {
+    "mutation": "< → <=",
+    "snippet": "for (let t = 16; t < 64; t++) {",
+    "reason": "Equivalent: the mutated bound runs one extra schedule iteration writing w[64], out of bounds on the fixed Uint32Array(64) — typed-array OOB writes are silently discarded and nothing reads past w[63]. Bit-identical output; the node:crypto oracle across many inputs passes either way."
+  },
+  {
+    "mutation": "< → <=",
+    "snippet": "for (let t = 0; t < 16; t++) w[t] = (bytes[off + 4 * t] << 24) | (bytes[off + 4 * t + 1] <",
+    "reason": "Equivalent: the extra iteration writes w[16] from message bytes, but the very next loop (t=16..63) unconditionally overwrites w[16] before any compression reads it. The pre-write is dead; SHA-256 output is bit-identical, proven by the node:crypto oracle."
+  },
+  {
+    "mutation": "< → <=",
+    "snippet": "for (let c = 0; c < colCount; c++) {",
+    "reason": "Equivalent: colCount is Math.max of the sample row lengths, so index colCount is out of range for every sampled row; the mutated bound reads r[colCount] which is always '' — zero dateHits/moneyHits and zero average length, so no index is ever assigned differently. Applies to both inference loops (identical shape)."
+  },
+  {
+    "mutation": "> → >=",
+    "snippet": "if (cur.length > 1 || cur[0] !== '') rows.push(cur);",
+    "reason": "Equivalent: this pushes the final row only when it holds real content. When cur.length===1 and cur[0] is non-empty the second clause already pushes it; when cur[0] is empty the pushed ['' ] row is stripped by the trailing .filter(all-empty). So >= only ever pushes rows the filter removes — identical output."
+  },
+  {
+    "mutation": ">= → >",
+    "snippet": "if (!t || typeof t.amount !== 'number' || t.amount >= 0) continue;",
+    "reason": "Equivalent for the average: >= vs > differ only for an amount of exactly 0, and a £0 transaction adds 0 to the running total, so the trailing-30-day burn (total / 30) is bit-identical whether the zero row is skipped or summed."
+  },
+  {
+    "mutation": "> → >=",
+    "snippet": "const totalIncome = transactions.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, ",
+    "reason": "Equivalent for the sum: > vs >= differ only for an amount of exactly 0, and including a £0 transaction adds 0 to totalIncome — the reduced value is identical either way (count of rows is never reported)."
+  },
+  {
+    "mutation": "< → <=",
+    "snippet": "const totalExpenses = transactions.filter(t => t.amount < 0).reduce((s, t) => s + t.amount",
+    "reason": "Equivalent for the sum: < vs <= differ only for an amount of exactly 0, and including a £0 transaction adds 0 to totalExpenses — the reduced value is identical either way (count of rows is never reported)."
+  }
+]

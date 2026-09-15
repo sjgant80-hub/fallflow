@@ -2,9 +2,25 @@
 
 sovereign single-file browser tool · MIT · @ai-native-solutions
 
-- Live: https://sjgant80-hub.github.io/fallflow/
+- **Live: https://sjgant80-hub.github.io/fallflow/**
 - Registry: https://sjgant80-hub.github.io/fallmarket/listing.html?id=fallflow
 - Publisher: [AI-Native Solutions](https://ai-nativesolutions.com)
+
+## v25 · a witness-gated cash-runway kernel (no LLM)
+
+Paste a bank CSV → see the **Friday you go red**, two weeks before it happens. The whole
+projection is a pure, deterministic kernel (`kernel.mjs`) — CSV parsing, expense
+categorisation, monthly repeating-expense detection, a day-by-day forward balance walk, and
+the red/amber/green Friday wall. **No model grades your cash flow; arithmetic does.**
+
+Every projection ships a **tamper-evident runway receipt** — a content-addressed SHA-256 seal
+over the exact inputs and outputs (`sealRunway`/`verifyRunway`). Change one number and the seal
+fails. This is the provable-AI wedge: a cash-flow warning you can *verify*, not just trust.
+
+The kernel is proven by a **mutation gate** (`node tools/witness.mjs mutate kernel.mjs …`, CI
+requires CLEAN) and the live page inlines that exact gated kernel between `⟦KERNEL⟧` markers, so
+the logic you run is the logic that was proven. Time is represented as integer UTC day-numbers,
+so a projection is fully deterministic and CI-reproducible.
 
 ## What this sovereign single-file browser tool does
 

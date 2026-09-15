@@ -284,6 +284,15 @@ footer a:hover { color: var(--gold); }
     </div>
 
     <div id="tab-export" class="tab-pane" style="display:none">
+      <div class="card" style="margin-bottom:16px">
+        <h2>Runway receipt <span class="sub">tamper-evident</span></h2>
+        <p style="font-family:'DM Mono';font-size:11px;color:var(--muted);line-height:1.6;margin:0 0 10px">Every projection is sealed with a content-addressed hash of its exact inputs and outputs. <strong style="color:var(--cream)">No model grades your cash flow — arithmetic does</strong>, and the seal proves this projection wasn't altered.</p>
+        <div id="receiptBody" style="font-family:'DM Mono';font-size:11px;line-height:1.7;padding:10px;border:1px solid var(--border);background:var(--void)"><span style="color:var(--muted)">Parse a CSV to mint a runway receipt.</span></div>
+        <div class="btn-row">
+          <button class="btn sm" id="verifyBtn">Verify receipt</button>
+          <button class="btn ghost sm" id="tamperBtn">Tamper test</button>
+        </div>
+      </div>
       <p style="font-family:'DM Mono';font-size:12px;color:var(--muted);line-height:1.6">Snapshot your projection — keep it, print it, share it.</p>
       <div class="btn-row">
         <button class="btn sm" id="exportJsonBtn">Snapshot JSON</button>
@@ -319,47 +328,447 @@ footer a:hover { color: var(--gold); }
 
 const VERSION = '1.0.0';
 const PRIME = 353;
+
+// ⟦KERNEL-BEGIN⟧ generated from kernel.mjs by make-page.mjs — do not edit here
+// fallflow · pure cash-runway kernel — no DOM, no clock, no IO. Total: garbage → {ok:false}, never throws.
+// Time is INTEGER DAY-NUMBERS (days since the Unix epoch, UTC) so a projection is deterministic
+// and CI-reproducible — no local timezone, no Date.now() ambient state. The page adapts at the boundary.
+// The provable payoff: sealRunway/verifyRunway — a content-addressed, tamper-evident receipt over the
+// exact inputs+outputs of a projection. No model grades your cash flow; arithmetic does, and the seal proves it.
+
+const KERNEL_VERSION = '2.0.0';
 const ONE_DAY = 86400000;
-const FRIDAY = 5; // JS getDay(): Sun=0..Sat=6
+
+// ── day-number helpers (UTC, deterministic) ──────────────────────────────
+function dayOf(ms) { return Math.floor(ms / ONE_DAY); }
+function isFriday(day) { return (((day % 7) + 7) % 7) === 1; } // epoch day 0 = Thu; Fri = day 1
+function domOf(day) { return new Date(day * ONE_DAY).getUTCDate(); } // day-of-month, 1..31
+
+// ── money / date parsing (pure, total) ───────────────────────────────────
+function parseMoney(s) {
+  s = String(s == null ? '' : s).trim();
+  if (s === '') return null;
+  let neg = false;
+  if (/^\(.*\)$/.test(s)) { neg = true; s = s.slice(1, -1); }
+  s = s.replace(/[£$€,\s]/g, '');
+  if (s.startsWith('-')) { neg = true; s = s.slice(1); }
+  const n = parseFloat(s);
+  if (isNaN(n)) return null;
+  return neg ? -n : n;
+}
+
+// Returns an integer day-number (UTC) or null. ISO first, then DD/MM/YYYY, then native.
+function parseDate(s) {
+  s = String(s == null ? '' : s).trim().replace(/['"]/g, '');
+  if (s === '') return null;
+  let m = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+  if (m) return Math.floor(Date.UTC(+m[1], +m[2] - 1, +m[3]) / ONE_DAY);
+  m = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})/);
+  if (m) {
+    let y = +m[3]; if (y < 100) y += 2000;
+    return Math.floor(Date.UTC(y, +m[2] - 1, +m[1]) / ONE_DAY);
+  }
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : Math.floor(d.getTime() / ONE_DAY);
+}
+
+// ── CSV parsing (pure, total) ─────────────────────────────────────────────
+function parseCSV(text) {
+  if (text === null || text === undefined) return [];
+  text = String(text).replace(/^﻿/, '').trim();
+  if (!text) return [];
+  const firstLine = text.split(/\r?\n/)[0];
+  const counts = { ',': 0, '\t': 0, ';': 0 };
+  let inQ = false;
+  for (const ch of firstLine) {
+    if (ch === '"') inQ = !inQ;
+    else if (!inQ && counts[ch] !== undefined) counts[ch]++;
+  }
+  const sep = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+  const rows = [];
+  let cur = [''], qq = false, i = 0;
+  while (i < text.length) {
+    const ch = text[i];
+    if (qq) {
+      if (ch === '"' && text[i + 1] === '"') { cur[cur.length - 1] += '"'; i += 2; continue; }
+      if (ch === '"') { qq = false; i++; continue; }
+      cur[cur.length - 1] += ch; i++;
+    } else {
+      if (ch === '"') { qq = true; i++; continue; }
+      if (ch === sep) { cur.push(''); i++; continue; }
+      if (ch === '\r') { i++; continue; }
+      if (ch === '\n') { rows.push(cur); cur = ['']; i++; continue; }
+      cur[cur.length - 1] += ch; i++;
+    }
+  }
+  if (cur.length > 1 || cur[0] !== '') rows.push(cur);
+  return rows.filter(r => r.some(c => c.trim() !== ''));
+}
+
+function detectColumns(rows) {
+  if (!Array.isArray(rows) || !rows.length) return null;
+  const first = rows[0].map(c => String(c).trim().toLowerCase());
+  const hasHeader = first.some(c => /date|description|amount|debit|credit|memo|reference|narrative|details/.test(c));
+  let dateIdx = -1, descIdx = -1, amtIdx = -1, debitIdx = -1, creditIdx = -1;
+  if (hasHeader) {
+    first.forEach((h, idx) => {
+      if (dateIdx < 0 && /date|posted/.test(h)) dateIdx = idx;
+      if (descIdx < 0 && /description|narrative|details|memo|reference|payee|merchant/.test(h)) descIdx = idx;
+      if (amtIdx < 0 && /^amount|total|value/.test(h)) amtIdx = idx;
+      if (debitIdx < 0 && /debit|out|paid out|money out/.test(h)) debitIdx = idx;
+      if (creditIdx < 0 && /credit|in|paid in|money in/.test(h)) creditIdx = idx;
+    });
+  }
+  if (dateIdx < 0 || (amtIdx < 0 && (debitIdx < 0 && creditIdx < 0))) {
+    const sample = (hasHeader ? rows.slice(1, 6) : rows.slice(0, 6));
+    const colCount = Math.max(...sample.map(r => r.length));
+    for (let c = 0; c < colCount; c++) {
+      const vals = sample.map(r => r[c] || '');
+      const dateHits = vals.filter(v => parseDate(v) !== null).length;
+      const moneyHits = vals.filter(v => parseMoney(v) !== null && /[\d.,()-]/.test(v)).length;
+      if (dateIdx < 0 && dateHits >= Math.max(2, vals.length - 1)) dateIdx = c;
+      else if (amtIdx < 0 && moneyHits >= Math.max(2, vals.length - 1)) amtIdx = c;
+    }
+    if (descIdx < 0) {
+      let best = -1, bestLen = 0;
+      for (let c = 0; c < colCount; c++) {
+        if (c === dateIdx || c === amtIdx) continue;
+        const avg = sample.reduce((s, r) => s + (r[c] || '').length, 0) / sample.length;
+        if (avg > bestLen) { bestLen = avg; best = c; }
+      }
+      descIdx = best;
+    }
+  }
+  return { hasHeader, dateIdx, descIdx, amtIdx, debitIdx, creditIdx };
+}
+
+// ── categorise (pure) ─────────────────────────────────────────────────────
+const CAT_RULES = [
+  { cat: 'rent', re: /\brent\b|landlord|letting/i },
+  { cat: 'payroll', re: /payroll|salary|wages|paye|hmrc paye/i },
+  { cat: 'tax', re: /\bhmrc\b|tax|vat|corp tax/i },
+  { cat: 'utilities', re: /electric|gas|water|edf|british gas|octopus|thames water|bt |sky |virgin media|three uk|vodafone|o2/i },
+  { cat: 'software', re: /aws|google|microsoft|adobe|github|stripe fee|figma|notion|slack|zoom|atlassian/i },
+  { cat: 'food', re: /tesco|sainsbury|asda|aldi|lidl|morrison|m&s food|waitrose|coop|spar|just eat|deliveroo|uber eats/i },
+  { cat: 'transport', re: /tfl|trainline|uber|bolt|esso|shell|bp |petrol|fuel/i },
+  { cat: 'standing-order', re: /standing order|s\/o\b|direct debit|d\/d\b/i },
+  { cat: 'fees', re: /fee|charge|interest/i },
+  { cat: 'transfer', re: /transfer|xfer|sent to|received from/i },
+];
+function autoCategorise(desc, amount) {
+  if (amount > 0) return 'income';
+  const d = String(desc == null ? '' : desc);
+  for (const r of CAT_RULES) if (r.re.test(d)) return r.cat;
+  return 'other';
+}
+
+// ── bank CSV → transactions [{day, desc, amount, category}] ───────────────
+function parseBankCSV(text) {
+  const rows = parseCSV(text);
+  if (!rows.length) return { ok: false, error: 'No data found' };
+  const cols = detectColumns(rows);
+  if (!cols || cols.dateIdx < 0) return { ok: false, error: 'Could not detect Date column' };
+  const dataRows = cols.hasHeader ? rows.slice(1) : rows;
+  const txs = [];
+  for (const r of dataRows) {
+    const day = parseDate(r[cols.dateIdx]);
+    if (day === null) continue;
+    let amount = null;
+    if (cols.amtIdx >= 0) amount = parseMoney(r[cols.amtIdx]);
+    if (amount === null && cols.debitIdx >= 0) {
+      const d = parseMoney(r[cols.debitIdx]);
+      if (d !== null && d !== 0) amount = -Math.abs(d);
+    }
+    if (amount === null && cols.creditIdx >= 0) {
+      const c = parseMoney(r[cols.creditIdx]);
+      if (c !== null && c !== 0) amount = Math.abs(c);
+    }
+    if (amount === null) continue;
+    const desc = (cols.descIdx >= 0 ? (r[cols.descIdx] || '') : '').trim() || '(no description)';
+    txs.push({ day, desc, amount, category: autoCategorise(desc, amount) });
+  }
+  txs.sort((a, b) => a.day - b.day);
+  return { ok: true, transactions: txs };
+}
+
+// ── repeating-expense detection (pure) ────────────────────────────────────
+function normalisedDesc(s) {
+  return String(s == null ? '' : s).toLowerCase().replace(/\d+/g, '').replace(/\s+/g, ' ').replace(/[^a-z ]/g, '').trim().slice(0, 30);
+}
+function detectRepeating(txs) {
+  if (!Array.isArray(txs)) return [];
+  const groups = {};
+  for (const t of txs) {
+    if (!t || typeof t.amount !== 'number' || t.amount >= 0) continue;
+    const key = normalisedDesc(t.desc);
+    if (!key) continue;
+    (groups[key] = groups[key] || []).push(t);
+  }
+  const reps = [];
+  for (const key in groups) {
+    const g = groups[key].sort((a, b) => a.day - b.day);
+    if (g.length < 2) continue;
+    const gaps = [];
+    for (let i = 1; i < g.length; i++) gaps.push(g[i].day - g[i - 1].day);
+    const monthly = gaps.filter(d => d >= 25 && d <= 35).length;
+    if (monthly < gaps.length * 0.6) continue;
+    const avgAmt = g.reduce((s, t) => s + t.amount, 0) / g.length;
+    const lastDay = g[g.length - 1].day;
+    reps.push({
+      desc: String(g[g.length - 1].desc).slice(0, 40),
+      amount: Math.round(avgAmt * 100) / 100,
+      dayOfMonth: domOf(lastDay),
+      lastDay,
+      signature: key,
+    });
+  }
+  return reps.sort((a, b) => a.amount - b.amount);
+}
+
+// ── variable daily burn (trailing 30d, excluding repeating) ───────────────
+function variableDailyAvg(txs, repeating, nowDay) {
+  if (!Array.isArray(txs)) return 0;
+  const cutoff = nowDay - 30;
+  const repSigs = new Set((Array.isArray(repeating) ? repeating : []).map(r => r && r.signature));
+  let total = 0;
+  for (const t of txs) {
+    if (!t || typeof t.amount !== 'number' || t.amount >= 0) continue;
+    if (t.day < cutoff) continue;
+    if (repSigs.has(normalisedDesc(t.desc))) continue;
+    total += t.amount;
+  }
+  return total / 30;
+}
+
+// ── classify a Friday balance ─────────────────────────────────────────────
+function classify(balance, floor) {
+  if (balance < 0) return 'red';
+  if (balance < floor) return 'amber';
+  return 'green';
+}
+
+// ── projection · day-by-day balance walked forward ────────────────────────
+// input: {transactions:[{day,amount}], invoices:[{dueDay,amount,latePct,locked?}],
+//         repeating:[{dayOfMonth,amount,locked?}], currentBalance:number|null,
+//         horizonDays:int, nowDay:int}
+function project(input) {
+  const transactions = Array.isArray(input.transactions) ? input.transactions : [];
+  const invoices = Array.isArray(input.invoices) ? input.invoices : [];
+  const repeating = Array.isArray(input.repeating) ? input.repeating : [];
+  const horizonDays = Math.max(0, Math.floor(input.horizonDays));
+  const nowDay = Math.floor(input.nowDay);
+  let bal = input.currentBalance;
+  if (bal === null || bal === undefined || isNaN(bal)) {
+    bal = transactions.reduce((s, t) => s + (typeof t.amount === 'number' ? t.amount : 0), 0);
+  }
+  const dailyVar = variableDailyAvg(transactions, repeating, nowDay);
+  const days = [];
+  for (let i = 0; i <= horizonDays; i++) {
+    const day = nowDay + i;
+    const events = [];
+    if (i > 0 && dailyVar !== 0) {
+      bal += dailyVar;
+      events.push({ desc: 'Variable expenses (avg)', amount: dailyVar });
+    }
+    for (const r of repeating) {
+      if (!r || r.locked) continue;
+      if (i > 0 && domOf(day) === r.dayOfMonth) {
+        bal += r.amount;
+        events.push({ desc: r.desc, amount: r.amount });
+      }
+    }
+    for (const inv of invoices) {
+      if (!inv || typeof inv.dueDay !== 'number') continue;
+      const slip = Math.round((inv.latePct / 100) * 14);
+      const expected = inv.dueDay + slip;
+      if (i > 0 && expected === day) {
+        bal += inv.amount;
+        events.push({ desc: inv.desc + ' (invoice)', amount: inv.amount });
+      }
+    }
+    days.push({ day, balance: bal, events });
+  }
+  return days;
+}
+
+function projectFridays(days) {
+  const fris = [];
+  for (const d of (Array.isArray(days) ? days : [])) if (isFriday(d.day)) fris.push(d);
+  return fris;
+}
+
+// ── high-level: the whole runway model + a tamper-evident receipt ─────────
+function runway(input) {
+  try {
+    if (!input || typeof input !== 'object') return { ok: false, error: 'input must be an object' };
+    if (typeof input.nowDay !== 'number' || !isFinite(input.nowDay)) return { ok: false, error: 'nowDay required' };
+    const floor = (typeof input.floor === 'number' && isFinite(input.floor)) ? input.floor : 0;
+    const horizonDays = (typeof input.horizonDays === 'number' && input.horizonDays >= 1) ? Math.floor(input.horizonDays) : 14;
+    const nowDay = Math.floor(input.nowDay);
+    const currentBalance = (typeof input.currentBalance === 'number' && isFinite(input.currentBalance)) ? input.currentBalance : null;
+
+    const transactions = (Array.isArray(input.transactions) ? input.transactions : [])
+      .filter(t => t && typeof t.day === 'number' && typeof t.amount === 'number');
+    const invoices = (Array.isArray(input.invoices) ? input.invoices : [])
+      .filter(v => v && typeof v.dueDay === 'number' && typeof v.amount === 'number')
+      .map(v => ({ dueDay: v.dueDay, amount: v.amount, desc: String(v.desc == null ? 'invoice' : v.desc), latePct: (typeof v.latePct === 'number' ? v.latePct : 0), locked: !!v.locked }));
+    const repeating = (Array.isArray(input.repeating) ? input.repeating : [])
+      .filter(r => r && typeof r.dayOfMonth === 'number' && typeof r.amount === 'number');
+
+    const days = project({ transactions, invoices, repeating, currentBalance, horizonDays, nowDay });
+    const fris = projectFridays(days);
+    const todayBalance = days.length ? days[0].balance : 0;
+    const endBalance = days.length ? days[days.length - 1].balance : 0;
+    const firstRed = fris.find(f => f.balance < 0) || null;
+
+    let prev = todayBalance;
+    const fridays = fris.map(f => {
+      const status = classify(f.balance, floor);
+      const row = { day: f.day, balance: round2(f.balance), status, delta: round2(f.balance - prev) };
+      prev = f.balance;
+      return row;
+    });
+
+    const totalIncome = transactions.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
+    const totalExpenses = transactions.filter(t => t.amount < 0).reduce((s, t) => s + t.amount, 0);
+    const dailyBurn = variableDailyAvg(transactions, repeating, nowDay);
+    const fixedMonthly = repeating.reduce((s, r) => s + r.amount, 0);
+
+    const model = {
+      version: KERNEL_VERSION,
+      nowDay,
+      horizonDays,
+      floor,
+      todayBalance: round2(todayBalance),
+      endBalance: round2(endBalance),
+      cliff: firstRed ? { day: firstRed.day, daysOut: firstRed.day - nowDay, balance: round2(firstRed.balance) } : null,
+      fridays,
+      summary: {
+        txCount: transactions.length,
+        totalIncome: round2(totalIncome),
+        totalExpenses: round2(totalExpenses),
+        dailyBurn: round2(dailyBurn),
+        fixedMonthly: round2(fixedMonthly),
+        invoiceCount: invoices.length,
+      },
+    };
+
+    const inputHash = sha256(canon({ transactions, invoices, repeating, currentBalance, floor, horizonDays, nowDay }));
+    const receipt = sealRunway({ v: KERNEL_VERSION, kind: 'fallflow-runway', nowDay, inputHash, model });
+    return { ok: true, model, receipt };
+  } catch (e) {
+    return { ok: false, error: 'runway failed' };
+  }
+}
+
+function round2(n) { return Math.round(n * 100) / 100; }
+
+// ── content-addressed, tamper-evident receipt ─────────────────────────────
+function sealRunway(payload) {
+  const body = { ...payload };
+  delete body.seal;
+  return { ...body, seal: sha256(canon(body)) };
+}
+function verifyRunway(receipt) {
+  if (!receipt || typeof receipt !== 'object') return { ok: false, reason: 'not an object' };
+  if (receipt.kind !== 'fallflow-runway') return { ok: false, reason: 'wrong kind' };
+  if (typeof receipt.seal !== 'string') return { ok: false, reason: 'no seal' };
+  const body = { ...receipt };
+  delete body.seal;
+  const expected = sha256(canon(body));
+  return expected === receipt.seal ? { ok: true } : { ok: false, reason: 'seal mismatch' };
+}
+
+// ── canonical JSON (sorted keys) ──────────────────────────────────────────
+function canon(x) {
+  if (x === undefined) return 'null';
+  if (x === null || typeof x !== 'object') return JSON.stringify(x);
+  if (Array.isArray(x)) return '[' + x.map(canon).join(',') + ']';
+  const keys = Object.keys(x).sort();
+  return '{' + keys.map(k => JSON.stringify(k) + ':' + canon(x[k])).join(',') + '}';
+}
+
+// ── sha256 (pure, explicit K256) ──────────────────────────────────────────
+const K256 = new Uint32Array([
+  0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+  0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+  0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+  0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+  0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+  0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+  0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+  0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+]);
+function rotr(x, n) { return (x >>> n) | (x << (32 - n)); }
+function sha256(ascii) {
+  ascii = String(ascii == null ? '' : ascii);
+  const bytes = [];
+  for (let i = 0; i < ascii.length; i++) {
+    let c = ascii.charCodeAt(i);
+    if (c < 0x80) bytes.push(c);
+    else if (c < 0x800) bytes.push(0xc0 | (c >> 6), 0x80 | (c & 0x3f));
+    else if (c < 0xd800 || c >= 0xe000) bytes.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f));
+    else { i++; c = 0x10000 + (((c & 0x3ff) << 10) | (ascii.charCodeAt(i) & 0x3ff)); bytes.push(0xf0 | (c >> 18), 0x80 | ((c >> 12) & 0x3f), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f)); }
+  }
+  const bitLen = bytes.length * 8;
+  bytes.push(0x80);
+  while (bytes.length % 64 !== 56) bytes.push(0);
+  const hi = Math.floor(bitLen / 0x100000000), lo = bitLen >>> 0;
+  bytes.push((hi >>> 24) & 0xff, (hi >>> 16) & 0xff, (hi >>> 8) & 0xff, hi & 0xff, (lo >>> 24) & 0xff, (lo >>> 16) & 0xff, (lo >>> 8) & 0xff, lo & 0xff);
+  const H = new Uint32Array([0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]);
+  const w = new Uint32Array(64);
+  for (let off = 0; off < bytes.length; off += 64) {
+    for (let t = 0; t < 16; t++) w[t] = (bytes[off + 4 * t] << 24) | (bytes[off + 4 * t + 1] << 16) | (bytes[off + 4 * t + 2] << 8) | (bytes[off + 4 * t + 3]);
+    for (let t = 16; t < 64; t++) {
+      const s0 = rotr(w[t - 15], 7) ^ rotr(w[t - 15], 18) ^ (w[t - 15] >>> 3);
+      const s1 = rotr(w[t - 2], 17) ^ rotr(w[t - 2], 19) ^ (w[t - 2] >>> 10);
+      w[t] = (w[t - 16] + s0 + w[t - 7] + s1) | 0;
+    }
+    let a = H[0], b = H[1], c = H[2], d = H[3], e = H[4], f = H[5], g = H[6], h = H[7];
+    for (let t = 0; t < 64; t++) {
+      const S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+      const ch = (e & f) ^ (~e & g);
+      const t1 = (h + S1 + ch + K256[t] + w[t]) | 0;
+      const S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+      const maj = (a & b) ^ (a & c) ^ (b & c);
+      const t2 = (S0 + maj) | 0;
+      h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+    }
+    H[0] = (H[0] + a) | 0; H[1] = (H[1] + b) | 0; H[2] = (H[2] + c) | 0; H[3] = (H[3] + d) | 0;
+    H[4] = (H[4] + e) | 0; H[5] = (H[5] + f) | 0; H[6] = (H[6] + g) | 0; H[7] = (H[7] + h) | 0;
+  }
+  let out = '';
+  for (let i = 0; i < 8; i++) out += (H[i] >>> 0).toString(16).padStart(8, '0');
+  return out;
+}
+// ⟦KERNEL-END⟧
 
 // ═══════════════════════════════════════════════════════════════
-// STATE
+// STATE · dates are integer DAY-NUMBERS (UTC), per kernel.mjs
 // ═══════════════════════════════════════════════════════════════
 const state = {
-  transactions: [],   // {date:Date, desc, amount, category}
-  invoices: [],       // {id, due:Date, amount, desc, latePct}
-  repeating: [],      // {desc, amount, dayOfMonth, signature, locked?}
-  settings: {
-    currentBalance: null,
-    floor: 2000,
-    accountName: 'Main account',
-  },
+  transactions: [],   // {day, desc, amount, category}
+  invoices: [],       // {id, dueDay, amount, desc, latePct}
+  repeating: [],      // {desc, amount, dayOfMonth, lastDay, signature, locked?}
+  settings: { currentBalance: null, floor: 2000, accountName: 'Main account' },
+  _receipt: null,
 };
 
 // ═══════════════════════════════════════════════════════════════
-// KONOMI LICENCE SHIM
-// Ed25519 dead-mode envelope · 30-day trial · device-bound
-// Free: 1 account · 14-day forward · watermark
-// Paid: multi-account · 60-day forward · scenario simulator
+// KONOMI LICENCE SHIM · Ed25519 dead-mode · 30-day trial · device-bound
 // ═══════════════════════════════════════════════════════════════
 const KONOMI = (() => {
-  const DEVICE_KEY = 'fallflow_device_id';
-  const TRIAL_KEY = 'fallflow_trial_start';
-  const LICENCE_KEY = 'fallflow_licence';
-  const USAGE_KEY = 'fallflow_usage';
+  const DEVICE_KEY = 'fallflow_device_id', TRIAL_KEY = 'fallflow_trial_start', LICENCE_KEY = 'fallflow_licence', USAGE_KEY = 'fallflow_usage';
   const TRIAL_DAYS = 30;
   let deviceId = localStorage.getItem(DEVICE_KEY);
-  if (!deviceId) {
-    deviceId = 'dev_' + (crypto.randomUUID ? crypto.randomUUID().slice(0,8) : Math.random().toString(36).slice(2,10));
-    localStorage.setItem(DEVICE_KEY, deviceId);
-  }
+  if (!deviceId) { deviceId = 'dev_' + (crypto.randomUUID ? crypto.randomUUID().slice(0,8) : Math.random().toString(36).slice(2,10)); localStorage.setItem(DEVICE_KEY, deviceId); }
   let trialStart = +localStorage.getItem(TRIAL_KEY);
   if (!trialStart) { trialStart = Date.now(); localStorage.setItem(TRIAL_KEY, String(trialStart)); }
-  const licence = localStorage.getItem(LICENCE_KEY); // ed25519 sig placeholder
+  const licence = localStorage.getItem(LICENCE_KEY);
   const trialDaysLeft = Math.max(0, TRIAL_DAYS - Math.floor((Date.now() - trialStart) / ONE_DAY));
   const usage = +(localStorage.getItem(USAGE_KEY) || 0);
   localStorage.setItem(USAGE_KEY, String(usage + 1));
-  const active = !!licence; // would be: Ed25519 verify(licence, deviceId)
+  const active = !!licence;
   const tier = active ? 'paid' : (trialDaysLeft > 0 ? 'trial' : 'free');
   return {
     deviceId, tier, active, trialDaysLeft, usage: usage + 1,
@@ -381,19 +790,14 @@ const mesh = (() => {
   try {
     const ch = new BroadcastChannel('fall-signal');
     ch.postMessage({ source: 'fallflow', type: 'hello', prime: PRIME, version: VERSION, ts: Date.now() });
-    return {
-      emit: (kind, payload) => {
-        try { ch.postMessage({ source: 'fallflow', type: kind, prime: PRIME, payload, ts: Date.now() }); } catch (e) {}
-      },
-    };
+    return { emit: (kind, payload) => { try { ch.postMessage({ source: 'fallflow', type: kind, prime: PRIME, payload, ts: Date.now() }); } catch (e) {} } };
   } catch (e) { return { emit: () => {} }; }
 })();
 
 // ═══════════════════════════════════════════════════════════════
 // PERSISTENCE · IndexedDB primary · localStorage fallback
 // ═══════════════════════════════════════════════════════════════
-const DB_NAME = 'fallflow';
-const DB_STORE = 'data';
+const DB_NAME = 'fallflow', DB_STORE = 'data';
 let _db = null;
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -405,13 +809,11 @@ function openDB() {
     req.onerror = () => reject(req.error);
   });
 }
+// backward-compat: old snapshots stored Date/ISO under .date/.due — migrate to day-numbers
+function migrateTx(t) { if (t && typeof t.day !== 'number' && t.date != null) { const d = parseDate(t.date); return { ...t, day: (d == null ? 0 : d) }; } return t; }
+function migrateInv(i) { if (i && typeof i.dueDay !== 'number' && i.due != null) { const d = parseDate(i.due); return { ...i, dueDay: (d == null ? 0 : d) }; } return i; }
 async function saveState() {
-  const snapshot = {
-    transactions: state.transactions.map(t => ({ ...t, date: t.date.toISOString() })),
-    invoices: state.invoices.map(i => ({ ...i, due: i.due.toISOString() })),
-    repeating: state.repeating,
-    settings: state.settings,
-  };
+  const snapshot = { transactions: state.transactions, invoices: state.invoices, repeating: state.repeating, settings: state.settings };
   try {
     const db = await openDB();
     const tx = db.transaction(DB_STORE, 'readwrite');
@@ -430,317 +832,59 @@ async function loadState() {
     try { snap = JSON.parse(localStorage.getItem('fallflow_state') || 'null'); } catch (e2) { snap = null; }
   }
   if (!snap) return false;
-  state.transactions = (snap.transactions || []).map(t => ({ ...t, date: new Date(t.date) }));
-  state.invoices = (snap.invoices || []).map(i => ({ ...i, due: new Date(i.due) }));
+  state.transactions = (snap.transactions || []).map(migrateTx);
+  state.invoices = (snap.invoices || []).map(migrateInv);
   state.repeating = snap.repeating || [];
   state.settings = { ...state.settings, ...(snap.settings || {}) };
   return true;
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CSV PARSER · vanilla · auto-detect separator + columns + dates
+// DISPLAY HELPERS (day-number aware; logic lives in the kernel)
 // ═══════════════════════════════════════════════════════════════
-function parseCSV(text) {
-  text = text.replace(/^﻿/, '').trim();
-  if (!text) return [];
-  // Detect separator from first line
-  const firstLine = text.split(/\r?\n/)[0];
-  const counts = { ',': 0, '\t': 0, ';': 0 };
-  let inQ = false;
-  for (const ch of firstLine) {
-    if (ch === '"') inQ = !inQ;
-    else if (!inQ && counts[ch] !== undefined) counts[ch]++;
-  }
-  const sep = Object.entries(counts).sort((a,b) => b[1]-a[1])[0][0];
-  // Parse rows
-  const rows = [];
-  let cur = [''], qq = false, i = 0;
-  while (i < text.length) {
-    const ch = text[i];
-    if (qq) {
-      if (ch === '"' && text[i+1] === '"') { cur[cur.length-1] += '"'; i += 2; continue; }
-      if (ch === '"') { qq = false; i++; continue; }
-      cur[cur.length-1] += ch; i++;
-    } else {
-      if (ch === '"') { qq = true; i++; continue; }
-      if (ch === sep) { cur.push(''); i++; continue; }
-      if (ch === '\r') { i++; continue; }
-      if (ch === '\n') { rows.push(cur); cur = ['']; i++; continue; }
-      cur[cur.length-1] += ch; i++;
-    }
-  }
-  if (cur.length > 1 || cur[0] !== '') rows.push(cur);
-  return rows.filter(r => r.some(c => c.trim() !== ''));
-}
-
-function parseDate(s) {
-  if (!s) return null;
-  s = s.trim().replace(/['"]/g, '');
-  // ISO YYYY-MM-DD or YYYY/MM/DD
-  let m = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
-  if (m) return new Date(+m[1], +m[2]-1, +m[3]);
-  // DD/MM/YYYY or DD-MM-YYYY
-  m = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})/);
-  if (m) {
-    let y = +m[3]; if (y < 100) y += 2000;
-    return new Date(y, +m[2]-1, +m[1]);
-  }
-  // Try native
-  const d = new Date(s);
-  return isNaN(d) ? null : d;
-}
-
-function parseMoney(s) {
-  if (!s) return null;
-  s = String(s).trim();
-  if (s === '') return null;
-  // strip £, $, €, commas, spaces, handle parens for negative
-  let neg = false;
-  if (/^\(.*\)$/.test(s)) { neg = true; s = s.slice(1,-1); }
-  s = s.replace(/[£$€,\s]/g, '');
-  if (s.startsWith('-')) { neg = true; s = s.slice(1); }
-  const n = parseFloat(s);
-  if (isNaN(n)) return null;
-  return neg ? -n : n;
-}
-
-function detectColumns(rows) {
-  if (!rows.length) return null;
-  // Look at first row — is it a header?
-  const first = rows[0].map(c => c.trim().toLowerCase());
-  const hasHeader = first.some(c => /date|description|amount|debit|credit|memo|reference|narrative|details/.test(c));
-  let dateIdx = -1, descIdx = -1, amtIdx = -1, debitIdx = -1, creditIdx = -1;
-  if (hasHeader) {
-    first.forEach((h, idx) => {
-      if (dateIdx < 0 && /date|posted/.test(h)) dateIdx = idx;
-      if (descIdx < 0 && /description|narrative|details|memo|reference|payee|merchant/.test(h)) descIdx = idx;
-      if (amtIdx < 0 && /^amount|total|value/.test(h)) amtIdx = idx;
-      if (debitIdx < 0 && /debit|out|paid out|money out/.test(h)) debitIdx = idx;
-      if (creditIdx < 0 && /credit|in|paid in|money in/.test(h)) creditIdx = idx;
-    });
-  }
-  if (dateIdx < 0 || (amtIdx < 0 && (debitIdx < 0 && creditIdx < 0))) {
-    // No reliable header — infer by content from sample rows
-    const sample = (hasHeader ? rows.slice(1, 6) : rows.slice(0, 6));
-    const colCount = Math.max(...sample.map(r => r.length));
-    for (let c = 0; c < colCount; c++) {
-      const vals = sample.map(r => r[c] || '');
-      const dateHits = vals.filter(v => parseDate(v)).length;
-      const moneyHits = vals.filter(v => parseMoney(v) !== null && /[\d.,()-]/.test(v)).length;
-      if (dateIdx < 0 && dateHits >= Math.max(2, vals.length - 1)) dateIdx = c;
-      else if (amtIdx < 0 && moneyHits >= Math.max(2, vals.length - 1)) amtIdx = c;
-    }
-    if (descIdx < 0) {
-      // pick the longest text-y column that isn't date/amt
-      let best = -1, bestLen = 0;
-      for (let c = 0; c < colCount; c++) {
-        if (c === dateIdx || c === amtIdx) continue;
-        const avg = sample.reduce((s,r) => s + (r[c] || '').length, 0) / sample.length;
-        if (avg > bestLen) { bestLen = avg; best = c; }
-      }
-      descIdx = best;
-    }
-  }
-  return { hasHeader, dateIdx, descIdx, amtIdx, debitIdx, creditIdx };
-}
-
-function parseBankCSV(text) {
-  const rows = parseCSV(text);
-  if (!rows.length) return { ok: false, error: 'No data found' };
-  const cols = detectColumns(rows);
-  if (!cols || cols.dateIdx < 0) return { ok: false, error: 'Could not detect Date column' };
-  const dataRows = cols.hasHeader ? rows.slice(1) : rows;
-  const txs = [];
-  for (const r of dataRows) {
-    const date = parseDate(r[cols.dateIdx]);
-    if (!date) continue;
-    let amount = null;
-    if (cols.amtIdx >= 0) amount = parseMoney(r[cols.amtIdx]);
-    if (amount === null && cols.debitIdx >= 0) {
-      const d = parseMoney(r[cols.debitIdx]);
-      if (d !== null && d !== 0) amount = -Math.abs(d);
-    }
-    if (amount === null && cols.creditIdx >= 0) {
-      const c = parseMoney(r[cols.creditIdx]);
-      if (c !== null && c !== 0) amount = Math.abs(c);
-    }
-    if (amount === null) continue;
-    const desc = (cols.descIdx >= 0 ? (r[cols.descIdx] || '') : '').trim() || '(no description)';
-    txs.push({ date, desc, amount, category: autoCategorise(desc, amount) });
-  }
-  txs.sort((a, b) => a.date - b.date);
-  return { ok: true, transactions: txs };
-}
-
-// ═══════════════════════════════════════════════════════════════
-// AUTO-CATEGORISE · smart heuristics from description
-// ═══════════════════════════════════════════════════════════════
-const CAT_RULES = [
-  { cat: 'rent', re: /\brent\b|landlord|letting/i },
-  { cat: 'payroll', re: /payroll|salary|wages|paye|hmrc paye/i },
-  { cat: 'tax', re: /\bhmrc\b|tax|vat|corp tax/i },
-  { cat: 'utilities', re: /electric|gas|water|edf|british gas|octopus|thames water|bt |sky |virgin media|three uk|vodafone|o2/i },
-  { cat: 'software', re: /aws|google|microsoft|adobe|github|stripe fee|figma|notion|slack|zoom|atlassian/i },
-  { cat: 'food', re: /tesco|sainsbury|asda|aldi|lidl|morrison|m&s food|waitrose|coop|spar|just eat|deliveroo|uber eats/i },
-  { cat: 'transport', re: /tfl|trainline|uber|bolt|esso|shell|bp |petrol|fuel/i },
-  { cat: 'standing-order', re: /standing order|s\/o\b|direct debit|d\/d\b/i },
-  { cat: 'fees', re: /fee|charge|interest/i },
-  { cat: 'transfer', re: /transfer|xfer|sent to|received from/i },
-];
-function autoCategorise(desc, amount) {
-  if (amount > 0) return 'income';
-  for (const r of CAT_RULES) if (r.re.test(desc)) return r.cat;
-  return 'other';
-}
-
-// ═══════════════════════════════════════════════════════════════
-// REPEATING EXPENSE DETECTOR
-// ═══════════════════════════════════════════════════════════════
-function normalisedDesc(s) {
-  return s.toLowerCase().replace(/\d+/g, '').replace(/\s+/g, ' ').replace(/[^a-z ]/g, '').trim().slice(0, 30);
-}
-function detectRepeating(txs) {
-  // Group by normalised desc, look for monthly cadence
-  const groups = {};
-  for (const t of txs) {
-    if (t.amount >= 0) continue; // expenses only
-    const key = normalisedDesc(t.desc);
-    if (!key) continue;
-    (groups[key] = groups[key] || []).push(t);
-  }
-  const reps = [];
-  for (const key in groups) {
-    const g = groups[key].sort((a,b) => a.date - b.date);
-    if (g.length < 2) continue;
-    // Check gaps look monthly (25-35 days)
-    const gaps = [];
-    for (let i = 1; i < g.length; i++) gaps.push((g[i].date - g[i-1].date) / ONE_DAY);
-    const monthly = gaps.filter(d => d >= 25 && d <= 35).length;
-    if (monthly < gaps.length * 0.6) continue;
-    const avgAmt = g.reduce((s, t) => s + t.amount, 0) / g.length;
-    const lastDate = g[g.length-1].date;
-    reps.push({
-      desc: g[g.length-1].desc.slice(0, 40),
-      amount: Math.round(avgAmt * 100) / 100,
-      dayOfMonth: lastDate.getDate(),
-      lastSeen: lastDate.toISOString(),
-      signature: key,
-    });
-  }
-  return reps.sort((a,b) => a.amount - b.amount);
-}
-
-// ═══════════════════════════════════════════════════════════════
-// VARIABLE EXPENSE AVERAGE (trailing 30d, excluding repeating)
-// ═══════════════════════════════════════════════════════════════
-function variableDailyAvg(txs, repeating) {
-  const now = Date.now();
-  const cutoff = now - 30 * ONE_DAY;
-  const repSigs = new Set(repeating.map(r => r.signature));
-  let total = 0, n = 0;
-  for (const t of txs) {
-    if (t.amount >= 0) continue;
-    if (t.date.getTime() < cutoff) continue;
-    if (repSigs.has(normalisedDesc(t.desc))) continue;
-    total += t.amount;
-    n++;
-  }
-  // distribute over 30 days
-  return total / 30;
-}
-
-// ═══════════════════════════════════════════════════════════════
-// PROJECTION · day-by-day, balance walked forward
-// ═══════════════════════════════════════════════════════════════
-function todayMidnight() { const d = new Date(); d.setHours(0,0,0,0); return d; }
+function dayToISO(day) { return new Date(day * ONE_DAY).toISOString().slice(0, 10); }
 function fmtGBP(n) { const v = Math.round(n); return (v < 0 ? '-£' : '£') + Math.abs(v).toLocaleString('en-GB'); }
 function fmtGBP2(n) { return (n < 0 ? '-£' : '£') + Math.abs(n).toFixed(2); }
-function isoDate(d) { return d.toISOString().slice(0, 10); }
-function fridayName(d) {
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return months[d.getMonth()] + ' ' + d.getDate();
-}
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function fridayName(day) { const d = new Date(day * ONE_DAY); return MONTHS[d.getUTCMonth()] + ' ' + d.getUTCDate(); }
+function escapeHTML(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-function project(horizonDays) {
-  const days = [];
-  const today = todayMidnight();
-  // Starting balance: user override OR sum of all transactions (assumes CSV is full history)
-  let bal = state.settings.currentBalance;
-  if (bal === null || bal === undefined || isNaN(bal)) {
-    bal = state.transactions.reduce((s, t) => s + t.amount, 0);
-  }
-  const dailyVar = variableDailyAvg(state.transactions, state.repeating);
-  for (let i = 0; i <= horizonDays; i++) {
-    const d = new Date(today.getTime() + i * ONE_DAY);
-    const events = [];
-    // Daily variable burn (skip day 0 to anchor today's bal)
-    if (i > 0 && dailyVar !== 0) {
-      bal += dailyVar;
-      events.push({ desc: 'Variable expenses (avg)', amount: dailyVar });
-    }
-    // Repeating expenses on their day-of-month
-    for (const r of state.repeating) {
-      if (r.locked) continue;
-      if (d.getDate() === r.dayOfMonth && i > 0) {
-        bal += r.amount;
-        events.push({ desc: r.desc, amount: r.amount });
-      }
-    }
-    // Invoices: expected payment day = due + (latePct/100)*14 days
-    for (const inv of state.invoices) {
-      const slip = Math.round((inv.latePct / 100) * 14);
-      const expected = new Date(inv.due.getTime() + slip * ONE_DAY);
-      expected.setHours(0,0,0,0);
-      if (i > 0 && expected.getTime() === d.getTime()) {
-        bal += inv.amount;
-        events.push({ desc: inv.desc + ' (invoice)', amount: inv.amount });
-      }
-    }
-    days.push({ date: d, balance: bal, events });
-  }
-  return days;
-}
-
-function projectFridays(days) {
-  const fris = [];
-  for (const d of days) {
-    if (d.date.getDay() === FRIDAY) fris.push(d);
-  }
-  return fris;
-}
-
-function classify(balance, floor) {
-  if (balance < 0) return 'red';
-  if (balance < floor) return 'amber';
-  return 'green';
+// ═══════════════════════════════════════════════════════════════
+// MODEL · build kernel input from state → runway() result (+receipt)
+// ═══════════════════════════════════════════════════════════════
+function buildModel() {
+  return runway({
+    nowDay: dayOf(Date.now()),
+    currentBalance: state.settings.currentBalance,
+    floor: state.settings.floor || 0,
+    horizonDays: KONOMI.horizonDays,
+    transactions: state.transactions,
+    invoices: state.invoices.map(i => ({ dueDay: i.dueDay, amount: i.amount, desc: i.desc, latePct: i.latePct })),
+    repeating: state.repeating,
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════
 // RENDER
 // ═══════════════════════════════════════════════════════════════
 function renderAll() {
-  const horizon = KONOMI.horizonDays;
-  const days = project(horizon);
-  const fris = projectFridays(days);
-  const floor = state.settings.floor || 0;
-  // Cliff bar
-  const todayBal = days[0]?.balance ?? 0;
-  const endBal = days[days.length-1]?.balance ?? 0;
-  const firstRed = fris.find(f => f.balance < 0);
+  const res = buildModel();
+  const m = res.ok ? res.model : null;
+  state._receipt = res.ok ? res.receipt : null;
+  const todayBal = m ? m.todayBalance : 0, endBal = m ? m.endBalance : 0, floor = state.settings.floor || 0;
   document.getElementById('todayBal').textContent = fmtGBP(todayBal);
   document.getElementById('todayBal').className = 'val ' + (todayBal < 0 ? 'bad' : 'ok');
   document.getElementById('endBal').textContent = fmtGBP(endBal);
   document.getElementById('endBal').className = 'val ' + (endBal < 0 ? 'bad' : (endBal < floor ? '' : 'ok'));
-  if (firstRed) {
-    document.getElementById('cliffDate').textContent = fridayName(firstRed.date);
+  if (m && m.cliff) {
+    document.getElementById('cliffDate').textContent = fridayName(m.cliff.day);
     document.getElementById('cliffDate').className = 'val bad';
-    const daysOut = Math.round((firstRed.date - todayMidnight()) / ONE_DAY);
-    document.getElementById('cliffDays').textContent = daysOut + ' days · ' + fmtGBP(firstRed.balance) + ' projected';
-    mesh.emit('cashflow_red_friday', { date: firstRed.date.toISOString(), balance: firstRed.balance, days: daysOut });
+    document.getElementById('cliffDays').textContent = m.cliff.daysOut + ' days · ' + fmtGBP(m.cliff.balance) + ' projected';
+    mesh.emit('cashflow_red_friday', { day: m.cliff.day, balance: m.cliff.balance, days: m.cliff.daysOut });
   } else {
-    document.getElementById('cliffDate').textContent = 'No cliff';
-    document.getElementById('cliffDate').className = 'val ok';
-    document.getElementById('cliffDays').textContent = 'Above £0 across ' + horizon + ' days';
+    document.getElementById('cliffDate').textContent = m ? 'No cliff' : '—';
+    document.getElementById('cliffDate').className = 'val ' + (m ? 'ok' : '');
+    document.getElementById('cliffDays').textContent = m ? ('Above £0 across ' + m.horizonDays + ' days') : '—';
   }
   // Wall
   const wall = document.getElementById('wallContainer');
@@ -748,67 +892,53 @@ function renderAll() {
     wall.innerHTML = '<div class="empty-hint">Paste a bank CSV on the left to see your Friday-by-Friday wall — <strong>red</strong> below £0, <strong>amber</strong> below your safety floor, <strong>green</strong> above. Or tap <strong>Load example</strong> to see it working.</div>';
   } else {
     let html = '<div class="wall">';
-    let prev = todayBal;
-    for (const f of fris) {
-      const cls = classify(f.balance, floor);
-      const delta = f.balance - prev;
-      const deltaStr = (delta >= 0 ? '+' : '') + fmtGBP(delta);
-      html += `<div class="fri ${cls}">
+    for (const f of (m ? m.fridays : [])) {
+      const deltaStr = (f.delta >= 0 ? '+' : '') + fmtGBP(f.delta);
+      html += `<div class="fri ${f.status}">
         <div>
-          <div class="date">Fri · ${fridayName(f.date)}</div>
+          <div class="date">Fri · ${fridayName(f.day)}</div>
           <div class="bal">${fmtGBP(f.balance)}</div>
           <div class="delta">Δ ${deltaStr} since last Fri</div>
         </div>
-        <div class="status">${cls === 'red' ? 'below zero' : cls === 'amber' ? 'below floor' : 'safe'}</div>
+        <div class="status">${f.status === 'red' ? 'below zero' : f.status === 'amber' ? 'below floor' : 'safe'}</div>
       </div>`;
-      prev = f.balance;
     }
     html += '</div>';
     wall.innerHTML = html;
   }
-  // Summary metrics
-  const totalIncome = state.transactions.filter(t => t.amount > 0).reduce((s,t) => s + t.amount, 0);
-  const totalExp = state.transactions.filter(t => t.amount < 0).reduce((s,t) => s + t.amount, 0);
-  const burnRate = variableDailyAvg(state.transactions, state.repeating);
-  const fixedMonthly = state.repeating.reduce((s, r) => s + r.amount, 0);
+  // Summary
+  const s = m ? m.summary : { txCount: 0, totalIncome: 0, totalExpenses: 0, dailyBurn: 0, fixedMonthly: 0, invoiceCount: 0 };
   document.getElementById('summary').innerHTML = `
-    <div class="metric"><div class="lbl">Transactions</div><div class="val">${state.transactions.length}</div></div>
-    <div class="metric"><div class="lbl">Income (history)</div><div class="val pos">${fmtGBP(totalIncome)}</div></div>
-    <div class="metric"><div class="lbl">Expenses (history)</div><div class="val neg">${fmtGBP(totalExp)}</div></div>
-    <div class="metric"><div class="lbl">Daily burn (variable)</div><div class="val neg">${fmtGBP(burnRate)}</div></div>
-    <div class="metric"><div class="lbl">Fixed monthly</div><div class="val neg">${fmtGBP(fixedMonthly)}</div></div>
-    <div class="metric"><div class="lbl">Open invoices</div><div class="val">${state.invoices.length}</div></div>
+    <div class="metric"><div class="lbl">Transactions</div><div class="val">${s.txCount}</div></div>
+    <div class="metric"><div class="lbl">Income (history)</div><div class="val pos">${fmtGBP(s.totalIncome)}</div></div>
+    <div class="metric"><div class="lbl">Expenses (history)</div><div class="val neg">${fmtGBP(s.totalExpenses)}</div></div>
+    <div class="metric"><div class="lbl">Daily burn (variable)</div><div class="val neg">${fmtGBP(s.dailyBurn)}</div></div>
+    <div class="metric"><div class="lbl">Fixed monthly</div><div class="val neg">${fmtGBP(s.fixedMonthly)}</div></div>
+    <div class="metric"><div class="lbl">Open invoices</div><div class="val">${s.invoiceCount}</div></div>
   `;
-  renderTx();
-  renderRep();
-  renderInv();
+  renderTx(); renderRep(); renderInv(); renderReceipt();
 }
 
 function renderTx() {
   const c = document.getElementById('txContainer');
   if (!state.transactions.length) { c.innerHTML = '<div class="empty-hint">No transactions yet — paste a CSV.</div>'; return; }
   const show = state.transactions.slice().reverse().slice(0, 200);
-  let html = '<div class="tx-list">';
   const cats = ['income','rent','payroll','tax','utilities','software','food','transport','standing-order','fees','transfer','other'];
-  for (let i = 0; i < show.length; i++) {
-    const t = show[i];
+  let html = '<div class="tx-list">';
+  for (const t of show) {
     const idx = state.transactions.indexOf(t);
     html += `<div class="tx-row">
-      <div class="date">${isoDate(t.date)}</div>
+      <div class="date">${dayToISO(t.day)}</div>
       <div class="desc" title="${escapeHTML(t.desc)}">${escapeHTML(t.desc)}</div>
       <div class="amt ${t.amount >= 0 ? 'pos' : 'neg'}">${fmtGBP2(t.amount)}</div>
-      <div class="cat"><select data-tx-cat="${idx}">${cats.map(c => `<option value="${c}"${c===t.category?' selected':''}>${c}</option>`).join('')}</select></div>
+      <div class="cat"><select data-tx-cat="${idx}">${cats.map(cc => `<option value="${cc}"${cc === t.category ? ' selected' : ''}>${cc}</option>`).join('')}</select></div>
     </div>`;
   }
   html += '</div>';
   if (state.transactions.length > 200) html += `<div style="font-family:'DM Mono';font-size:11px;color:var(--muted);padding:8px 4px">showing latest 200 of ${state.transactions.length}</div>`;
   c.innerHTML = html;
   c.querySelectorAll('select[data-tx-cat]').forEach(sel => {
-    sel.addEventListener('change', () => {
-      const i = +sel.getAttribute('data-tx-cat');
-      state.transactions[i].category = sel.value;
-      saveState();
-    });
+    sel.addEventListener('change', () => { state.transactions[+sel.getAttribute('data-tx-cat')].category = sel.value; saveState(); });
   });
 }
 
@@ -827,12 +957,7 @@ function renderRep() {
   }
   html += '</div>';
   c.innerHTML = html;
-  c.querySelectorAll('[data-rep-del]').forEach(b => {
-    b.addEventListener('click', () => {
-      state.repeating.splice(+b.getAttribute('data-rep-del'), 1);
-      saveState(); renderAll();
-    });
-  });
+  c.querySelectorAll('[data-rep-del]').forEach(b => { b.addEventListener('click', () => { state.repeating.splice(+b.getAttribute('data-rep-del'), 1); saveState(); renderAll(); }); });
 }
 
 function renderInv() {
@@ -842,36 +967,29 @@ function renderInv() {
   for (let i = 0; i < state.invoices.length; i++) {
     const inv = state.invoices[i];
     html += `<div class="inv-row">
-      <div class="date">${isoDate(inv.due)}</div>
+      <div class="date">${dayToISO(inv.dueDay)}</div>
       <div class="desc" title="${escapeHTML(inv.desc)}">${escapeHTML(inv.desc)}</div>
       <div class="amt pos">${fmtGBP2(inv.amount)}</div>
       <div class="late"><select data-inv-late="${i}">
-        <option value="0"${inv.latePct===0?' selected':''}>0%</option>
-        <option value="50"${inv.latePct===50?' selected':''}>50%</option>
-        <option value="100"${inv.latePct===100?' selected':''}>100%</option>
+        <option value="0"${inv.latePct === 0 ? ' selected' : ''}>0%</option>
+        <option value="50"${inv.latePct === 50 ? ' selected' : ''}>50%</option>
+        <option value="100"${inv.latePct === 100 ? ' selected' : ''}>100%</option>
       </select></div>
       <button class="icon-btn" data-inv-del="${i}" title="remove">×</button>
     </div>`;
   }
   html += '</div>';
   c.innerHTML = html;
-  c.querySelectorAll('[data-inv-del]').forEach(b => {
-    b.addEventListener('click', () => {
-      state.invoices.splice(+b.getAttribute('data-inv-del'), 1);
-      saveState(); renderAll();
-    });
-  });
-  c.querySelectorAll('[data-inv-late]').forEach(s => {
-    s.addEventListener('change', () => {
-      const i = +s.getAttribute('data-inv-late');
-      state.invoices[i].latePct = +s.value;
-      saveState(); renderAll();
-    });
-  });
+  c.querySelectorAll('[data-inv-del]').forEach(b => { b.addEventListener('click', () => { state.invoices.splice(+b.getAttribute('data-inv-del'), 1); saveState(); renderAll(); }); });
+  c.querySelectorAll('[data-inv-late]').forEach(sel => { sel.addEventListener('change', () => { state.invoices[+sel.getAttribute('data-inv-late')].latePct = +sel.value; saveState(); renderAll(); }); });
 }
 
-function escapeHTML(s) {
-  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function renderReceipt() {
+  const el = document.getElementById('receiptBody');
+  if (!el) return;
+  const r = state._receipt;
+  if (!r) { el.innerHTML = '<span style="color:var(--muted)">Parse a CSV to mint a runway receipt.</span>'; return; }
+  el.innerHTML = `<div style="word-break:break-all"><span style="color:var(--muted)">kind</span> ${r.kind}<br><span style="color:var(--muted)">nowDay</span> ${r.nowDay} · <span style="color:var(--muted)">inputHash</span> ${r.inputHash.slice(0,16)}…<br><span style="color:var(--muted)">seal</span> <span style="color:var(--gold)">${r.seal.slice(0,32)}…</span></div>`;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -885,81 +1003,51 @@ function parseAndApply() {
   if (!r.transactions.length) { toast('No valid rows found — check column format'); return; }
   state.transactions = r.transactions;
   state.repeating = detectRepeating(r.transactions);
-  saveState();
-  renderAll();
+  saveState(); renderAll();
   toast(r.transactions.length + ' transactions parsed · ' + state.repeating.length + ' repeating detected');
 }
 
 function loadExample() {
-  const today = todayMidnight();
+  const nowDay = dayOf(Date.now());
   const lines = ['Date,Description,Amount'];
-  // Build 45-day history with realistic patterns
   for (let i = 45; i >= 1; i--) {
-    const d = new Date(today.getTime() - i * ONE_DAY);
-    const iso = isoDate(d);
-    // Monthly rent on the 1st
-    if (d.getDate() === 1) lines.push(`${iso},Standing Order Rent,-1850.00`);
-    // Monthly payroll on the 28th
-    if (d.getDate() === 28) lines.push(`${iso},Payroll Sarah Wages,-2100.00`);
-    // Weekly Tesco shops
-    if (d.getDay() === 6) lines.push(`${iso},Tesco Stores Croydon,${-(35 + Math.random()*45).toFixed(2)}`);
-    // Software DD on the 15th
-    if (d.getDate() === 15) lines.push(`${iso},AWS Web Services,-247.30`);
-    if (d.getDate() === 15) lines.push(`${iso},Adobe Creative Cloud,-52.99`);
-    // Random fuel
-    if (i % 7 === 3) lines.push(`${iso},Shell Petrol Station,${-(45 + Math.random()*20).toFixed(2)}`);
-    // Random food delivery
-    if (i % 11 === 2) lines.push(`${iso},Deliveroo,${-(22 + Math.random()*18).toFixed(2)}`);
-    // Income — Acme Ltd pays 25th
-    if (d.getDate() === 25) lines.push(`${iso},Acme Ltd invoice 001,4500.00`);
-    // Smaller client every fortnight
+    const day = nowDay - i, d = new Date(day * ONE_DAY), iso = dayToISO(day), dom = d.getUTCDate(), dow = d.getUTCDay();
+    if (dom === 1) lines.push(`${iso},Standing Order Rent,-1850.00`);
+    if (dom === 28) lines.push(`${iso},Payroll Sarah Wages,-2100.00`);
+    if (dow === 6) lines.push(`${iso},Tesco Stores Croydon,${-(35 + Math.random() * 45).toFixed(2)}`);
+    if (dom === 15) { lines.push(`${iso},AWS Web Services,-247.30`); lines.push(`${iso},Adobe Creative Cloud,-52.99`); }
+    if (i % 7 === 3) lines.push(`${iso},Shell Petrol Station,${-(45 + Math.random() * 20).toFixed(2)}`);
+    if (i % 11 === 2) lines.push(`${iso},Deliveroo,${-(22 + Math.random() * 18).toFixed(2)}`);
+    if (dom === 25) lines.push(`${iso},Acme Ltd invoice 001,4500.00`);
     if (i === 10 || i === 24 || i === 38) lines.push(`${iso},Bright Studio Ltd,1200.00`);
   }
   document.getElementById('csvInput').value = lines.join('\n');
   document.getElementById('curBal').value = '3400';
   state.settings.currentBalance = 3400;
-  // Add an example invoice 9 days out
-  const exampleInv = {
-    id: 'ex_' + Date.now(),
-    due: new Date(today.getTime() + 9 * ONE_DAY),
-    amount: 2400,
-    desc: 'Acme Ltd · invoice 042',
-    latePct: 50,
-  };
-  state.invoices = [exampleInv];
+  state.invoices = [{ id: 'ex_' + Date.now(), dueDay: nowDay + 9, amount: 2400, desc: 'Acme Ltd · invoice 042', latePct: 50 }];
   parseAndApply();
   toast('Example loaded · 45 days history · 1 upcoming invoice');
 }
 
 function addInvoice() {
-  const due = parseDate(document.getElementById('invDate').value);
+  const dueDay = parseDate(document.getElementById('invDate').value);
   const amt = parseFloat(document.getElementById('invAmt').value);
   const desc = document.getElementById('invDesc').value.trim() || 'invoice';
   const late = +document.getElementById('invLate').value;
-  if (!due) { toast('Enter a due date'); return; }
+  if (dueDay === null) { toast('Enter a due date'); return; }
   if (!amt || isNaN(amt)) { toast('Enter an amount'); return; }
-  state.invoices.push({ id: 'i_' + Date.now(), due, amount: Math.abs(amt), desc, latePct: late });
-  document.getElementById('invDate').value = '';
-  document.getElementById('invAmt').value = '';
-  document.getElementById('invDesc').value = '';
-  saveState();
-  renderAll();
-  toast('Invoice added · ' + fmtGBP(Math.abs(amt)) + ' due ' + isoDate(due));
+  state.invoices.push({ id: 'i_' + Date.now(), dueDay, amount: Math.abs(amt), desc, latePct: late });
+  document.getElementById('invDate').value = ''; document.getElementById('invAmt').value = ''; document.getElementById('invDesc').value = '';
+  saveState(); renderAll();
+  toast('Invoice added · ' + fmtGBP(Math.abs(amt)) + ' due ' + dayToISO(dueDay));
 }
 
 function exportJSON() {
-  const snap = {
-    version: VERSION,
-    exported: new Date().toISOString(),
-    transactions: state.transactions.map(t => ({ ...t, date: t.date.toISOString() })),
-    invoices: state.invoices.map(i => ({ ...i, due: i.due.toISOString() })),
-    repeating: state.repeating,
-    settings: state.settings,
-  };
+  const snap = { version: VERSION, exported: new Date().toISOString(), transactions: state.transactions, invoices: state.invoices, repeating: state.repeating, settings: state.settings, receipt: state._receipt };
   const blob = new Blob([JSON.stringify(snap, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'fallflow-' + isoDate(new Date()) + '.json';
+  a.download = 'fallflow-' + dayToISO(dayOf(Date.now())) + '.json';
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -969,8 +1057,8 @@ function importJSON(file) {
   r.onload = () => {
     try {
       const snap = JSON.parse(r.result);
-      state.transactions = (snap.transactions || []).map(t => ({ ...t, date: new Date(t.date) }));
-      state.invoices = (snap.invoices || []).map(i => ({ ...i, due: new Date(i.due) }));
+      state.transactions = (snap.transactions || []).map(migrateTx);
+      state.invoices = (snap.invoices || []).map(migrateInv);
       state.repeating = snap.repeating || [];
       state.settings = { ...state.settings, ...(snap.settings || {}) };
       document.getElementById('curBal').value = state.settings.currentBalance ?? '';
@@ -984,17 +1072,8 @@ function importJSON(file) {
 }
 
 function shareLink() {
-  const snap = {
-    v: VERSION,
-    s: state.settings,
-    i: state.invoices.map(i => ({ ...i, due: i.due.toISOString() })),
-    r: state.repeating,
-    // Only share derived metrics, not raw tx (privacy)
-    summary: {
-      todayBal: project(KONOMI.horizonDays)[0]?.balance ?? 0,
-      txCount: state.transactions.length,
-    },
-  };
+  const mm = buildModel();
+  const snap = { v: VERSION, s: state.settings, i: state.invoices, r: state.repeating, summary: { todayBal: mm.ok ? mm.model.todayBalance : 0, txCount: state.transactions.length } };
   try {
     const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(snap))));
     const url = location.origin + location.pathname + '#s=' + encoded;
@@ -1008,7 +1087,7 @@ function loadFromHash() {
     const encoded = location.hash.slice(3);
     const snap = JSON.parse(decodeURIComponent(escape(atob(encoded))));
     state.settings = { ...state.settings, ...(snap.s || {}) };
-    state.invoices = (snap.i || []).map(i => ({ ...i, due: new Date(i.due) }));
+    state.invoices = (snap.i || []).map(migrateInv);
     state.repeating = snap.r || [];
     toast('Shared projection loaded · read-only · paste your own CSV to extend');
   } catch (e) {}
@@ -1039,7 +1118,6 @@ function showModal(title, body) {
 }
 
 function wire() {
-  // Tabs
   document.querySelectorAll('.tabs button').forEach(b => {
     b.addEventListener('click', () => {
       document.querySelectorAll('.tabs button').forEach(x => x.classList.remove('active'));
@@ -1049,12 +1127,11 @@ function wire() {
       document.getElementById('tab-' + t).style.display = 'block';
     });
   });
-  // Buttons
   document.getElementById('parseBtn').addEventListener('click', parseAndApply);
   document.getElementById('exampleBtn').addEventListener('click', loadExample);
   document.getElementById('clearBtn').addEventListener('click', () => {
     if (!confirm('Clear all data — transactions, invoices, settings?')) return;
-    state.transactions = []; state.invoices = []; state.repeating = [];
+    state.transactions = []; state.invoices = []; state.repeating = []; state._receipt = null;
     state.settings = { currentBalance: null, floor: 2000, accountName: 'Main account' };
     document.getElementById('csvInput').value = '';
     document.getElementById('curBal').value = '';
@@ -1066,13 +1143,9 @@ function wire() {
   document.getElementById('addInvBtn').addEventListener('click', addInvoice);
   document.getElementById('exportJsonBtn').addEventListener('click', exportJSON);
   document.getElementById('importJsonBtn').addEventListener('click', () => document.getElementById('importFile').click());
-  document.getElementById('importFile').addEventListener('change', (e) => {
-    if (e.target.files[0]) importJSON(e.target.files[0]);
-    e.target.value = '';
-  });
+  document.getElementById('importFile').addEventListener('change', (e) => { if (e.target.files[0]) importJSON(e.target.files[0]); e.target.value = ''; });
   document.getElementById('printBtn').addEventListener('click', () => window.print());
   document.getElementById('shareBtn').addEventListener('click', shareLink);
-  // Settings live update
   document.getElementById('curBal').addEventListener('input', () => {
     const v = parseFloat(document.getElementById('curBal').value);
     state.settings.currentBalance = isNaN(v) ? null : v;
@@ -1085,6 +1158,21 @@ function wire() {
   document.getElementById('acctName').addEventListener('input', () => {
     state.settings.accountName = document.getElementById('acctName').value;
     saveState();
+  });
+  // Runway receipt · verify + tamper demo (the provable payoff)
+  const vb = document.getElementById('verifyBtn');
+  if (vb) vb.addEventListener('click', () => {
+    if (!state._receipt) { toast('No receipt yet — parse a CSV'); return; }
+    const v = verifyRunway(state._receipt);
+    toast(v.ok ? '✓ Receipt verifies — projection is authentic' : '✗ Receipt INVALID: ' + v.reason);
+  });
+  const tb = document.getElementById('tamperBtn');
+  if (tb) tb.addEventListener('click', () => {
+    if (!state._receipt) { toast('No receipt yet — parse a CSV'); return; }
+    const forged = JSON.parse(JSON.stringify(state._receipt));
+    forged.model.todayBalance = (forged.model.todayBalance || 0) + 1000000;
+    const v = verifyRunway(forged);
+    toast(v.ok ? 'tamper undetected (bug!)' : '✓ Tamper caught — ' + v.reason + ' (balance forged +£1,000,000)');
   });
   // Tier badge
   const tierEl = document.getElementById('tierBadge');
